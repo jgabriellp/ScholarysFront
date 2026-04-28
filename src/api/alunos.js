@@ -11,3 +11,6 @@ export const updateAluno = (id, data) =>
 
 export const deleteAluno = (id) =>
   client.delete(`/api/aluno/${id}`);
+
+export const getAlunosByTurma = (turmaId) =>
+  client.get(`/api/aluno/turma/${turmaId}`);
