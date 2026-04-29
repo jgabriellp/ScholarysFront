@@ -13,7 +13,7 @@ import {
 } from "react-bootstrap";
 import { Users, Plus, Pencil, Trash2 } from "lucide-react";
 import {
-  getTurmas,
+  getTurmasByAnoLetivo,
   createTurma,
   updateTurma,
   deleteTurma,
@@ -32,41 +32,37 @@ const defaultForm = { nome: "", segmento: 0, anoLetivoId: "" };
 
 export default function Turmas() {
   const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [anosLetivos, setAnosLetivos] = useState([]);
+  const [anoLetivoFiltro, setAnoLetivoFiltro] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loadingSelects, setLoadingSelects] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const pageSize = 10;
-
   useEffect(() => {
-    loadAnosLetivos();
+    getAnoLetivos()
+      .then(({ data }) => {
+        setAnosLetivos(data.data);
+        if (data.data.length > 0) setAnoLetivoFiltro(String(data.data[0].id));
+      })
+      .finally(() => setLoadingSelects(false));
   }, []);
 
   useEffect(() => {
+    if (!anoLetivoFiltro) return;
     load();
-  }, [page]);
-
-  async function loadAnosLetivos() {
-    try {
-      const { data } = await getAnoLetivos();
-      setAnosLetivos(data.data);
-    } catch {
-      /* silencioso */
-    }
-  }
+  }, [anoLetivoFiltro]);
 
   async function load() {
     setLoading(true);
     try {
-      const { data } = await getTurmas(page, pageSize);
-      setItems(data.data);
-      setTotal(data.total);
+      const { data } = await getTurmasByAnoLetivo(anoLetivoFiltro);
+      setItems(Array.isArray(data) ? data : data.data ?? []);
+    } catch {
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -78,7 +74,7 @@ export default function Turmas() {
 
   function openCreate() {
     setEditItem(null);
-    setForm({ ...defaultForm, anoLetivoId: anosLetivos[0]?.id ?? "" });
+    setForm({ ...defaultForm, anoLetivoId: anoLetivoFiltro });
     setError("");
     setShowModal(true);
   }
@@ -128,6 +124,10 @@ export default function Turmas() {
     }
   }
 
+  if (loadingSelects) {
+    return <div className="text-center p-5"><Spinner variant="primary" /></div>;
+  }
+
   return (
     <div>
       <div className="d-flex align-items-center justify-content-between mb-4">
@@ -136,20 +136,38 @@ export default function Turmas() {
           <h5 className="fw-bold text-slate-800 mb-0">Turmas</h5>
         </div>
         <Button
-          size="md"
           variant="primary"
           onClick={openCreate}
           disabled={anosLetivos.length === 0}
         >
+          <Plus size={14} className="me-1" />
           Nova Turma
         </Button>
       </div>
 
-      {anosLetivos.length === 0 && !loading && (
+      {anosLetivos.length === 0 && (
         <Alert variant="warning" className="small py-2 mb-3">
           Cadastre um <strong>Ano Letivo</strong> antes de criar turmas.
         </Alert>
       )}
+
+      <Card className="border-0 shadow-sm mb-3">
+        <Card.Body className="py-3 px-4">
+          <Form.Group>
+            <Form.Label className="small fw-medium">Ano Letivo</Form.Label>
+            <Form.Select
+              value={anoLetivoFiltro}
+              onChange={(e) => setAnoLetivoFiltro(e.target.value)}
+              style={{ maxWidth: 200 }}
+            >
+              <option value="">Selecione</option>
+              {anosLetivos.map((a) => (
+                <option key={a.id} value={a.id}>{a.ano}</option>
+              ))}
+            </Form.Select>
+          </Form.Group>
+        </Card.Body>
+      </Card>
 
       <Card className="border-0 shadow-sm">
         <Card.Body className="p-0">
@@ -157,9 +175,13 @@ export default function Turmas() {
             <div className="text-center p-5">
               <Spinner variant="primary" />
             </div>
+          ) : !anoLetivoFiltro ? (
+            <p className="text-muted text-center p-5 mb-0 small">
+              Selecione um ano letivo para ver as turmas.
+            </p>
           ) : items.length === 0 ? (
             <p className="text-muted text-center p-5 mb-0 small">
-              Nenhuma turma cadastrada.
+              Nenhuma turma cadastrada para este ano letivo.
             </p>
           ) : (
             <Table hover responsive className="mb-0">
@@ -167,7 +189,6 @@ export default function Turmas() {
                 <tr>
                   <th className="ps-4">Nome</th>
                   <th>Segmento</th>
-                  <th>Ano Letivo</th>
                   <th style={{ width: 100 }}>Ações</th>
                 </tr>
               </thead>
@@ -180,7 +201,6 @@ export default function Turmas() {
                         {SEGMENTO_LABELS[item.segmento]}
                       </Badge>
                     </td>
-                    <td>{item.anoLetivoAno}</td>
                     <td>
                       <div className="d-flex gap-1">
                         <Button
@@ -205,29 +225,6 @@ export default function Turmas() {
             </Table>
           )}
         </Card.Body>
-        {total > pageSize && (
-          <Card.Footer className="d-flex justify-content-between align-items-center py-2 px-4 bg-white border-top">
-            <small className="text-muted">{total} registros</small>
-            <div className="d-flex gap-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                Anterior
-              </Button>
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                disabled={page * pageSize >= total}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Próximo
-              </Button>
-            </div>
-          </Card.Footer>
-        )}
       </Card>
 
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
@@ -274,9 +271,7 @@ export default function Turmas() {
               </Col>
               <Col xs={6}>
                 <Form.Group>
-                  <Form.Label className="small fw-medium">
-                    Ano Letivo
-                  </Form.Label>
+                  <Form.Label className="small fw-medium">Ano Letivo</Form.Label>
                   <Form.Select
                     value={form.anoLetivoId}
                     onChange={(e) => set("anoLetivoId", e.target.value)}

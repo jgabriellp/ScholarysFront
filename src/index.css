@@ -23,3 +23,23 @@ body {
 .sidebar-section {
   @apply px-4 py-1 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-1;
 }
+
+@media print {
+  /* Oculta tudo, exibe apenas o conteúdo do diário */
+  body * { visibility: hidden; }
+  #diario-content, #diario-content * { visibility: visible; }
+  #diario-content {
+    position: absolute;
+    inset: 0;
+    padding: 24px;
+    background: white;
+  }
+  /* Remove sombras e ajusta bordas para impressão */
+  #diario-content .shadow-sm { box-shadow: none !important; }
+  #diario-content .border-0 { border: 1px solid #dee2e6 !important; }
+  /* Evita quebra dentro de cards */
+  #diario-content .card { break-inside: avoid; }
+  /* Tabela de notas: permite quebra apenas entre linhas */
+  #diario-content table { break-inside: auto; }
+  #diario-content tr { break-inside: avoid; }
+}
