@@ -2,38 +2,55 @@ import { useState, useEffect } from 'react';
 import { Card, Table, Button, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
 import { ClipboardList } from 'lucide-react';
 import { getFrequenciaByTurmaData, lancaFrequencia } from '../api/frequencia';
-import { getTurmas } from '../api/turmas';
+import { getTurmasByAnoLetivo } from '../api/turmas';
 import { getAnoLetivos } from '../api/anoLetivo';
 import { getAlunosByTurma } from '../api/alunos';
 
 export default function Frequencia() {
   const today = new Date().toISOString().split('T')[0];
 
-  const [turmas, setTurmas] = useState([]);
   const [anosLetivos, setAnosLetivos] = useState([]);
-  const [turmaSelecionada, setTurmaSelecionada] = useState('');
-  const [anoLetivoSelecionado, setAnoLetivoSelecionado] = useState('');
-  const [data, setData] = useState(today);
+  const [turmas, setTurmas] = useState([]);
   const [alunos, setAlunos] = useState([]);
   const [presencas, setPresencas] = useState({});
+
+  const [anoLetivoSelecionado, setAnoLetivoSelecionado] = useState('');
+  const [turmaSelecionada, setTurmaSelecionada] = useState('');
+  const [data, setData] = useState(today);
+
   const [loadingSelects, setLoadingSelects] = useState(true);
+  const [loadingTurmas, setLoadingTurmas] = useState(false);
   const [loadingAlunos, setLoadingAlunos] = useState(false);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
 
+  // Mount: carrega anos letivos e seleciona o primeiro
   useEffect(() => {
-    Promise.all([getTurmas(), getAnoLetivos()])
-      .then(([turmasRes, anosRes]) => {
-        setTurmas(turmasRes.data.data);
-        setAnosLetivos(anosRes.data.data);
-        if (anosRes.data.data.length > 0) {
-          setAnoLetivoSelecionado(String(anosRes.data.data[0].id));
-        }
+    getAnoLetivos()
+      .then(({ data: res }) => {
+        setAnosLetivos(res.data);
+        if (res.data.length > 0) setAnoLetivoSelecionado(String(res.data[0].id));
       })
       .finally(() => setLoadingSelects(false));
   }, []);
 
+  // Ano letivo → turmas
+  useEffect(() => {
+    setTurmas([]);
+    setTurmaSelecionada('');
+    setAlunos([]);
+    setPresencas({});
+    if (!anoLetivoSelecionado) return;
+
+    setLoadingTurmas(true);
+    getTurmasByAnoLetivo(anoLetivoSelecionado)
+      .then(({ data }) => setTurmas(Array.isArray(data) ? data : data.data ?? []))
+      .catch(() => setTurmas([]))
+      .finally(() => setLoadingTurmas(false));
+  }, [anoLetivoSelecionado]);
+
+  // Turma + data → alunos e frequência existente
   useEffect(() => {
     if (!turmaSelecionada) {
       setAlunos([]);
@@ -114,20 +131,6 @@ export default function Frequencia() {
       <Card className="border-0 shadow-sm mb-3">
         <Card.Body className="py-3 px-4">
           <Row className="g-3 align-items-end">
-            <Col xs={12} md={4}>
-              <Form.Group>
-                <Form.Label className="small fw-medium">Turma</Form.Label>
-                <Form.Select
-                  value={turmaSelecionada}
-                  onChange={(e) => setTurmaSelecionada(e.target.value)}
-                >
-                  <option value="">Selecione a turma</option>
-                  {turmas.map((t) => (
-                    <option key={t.id} value={t.id}>{t.nome}</option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-            </Col>
             <Col xs={12} md={3}>
               <Form.Group>
                 <Form.Label className="small fw-medium">Ano Letivo</Form.Label>
@@ -140,6 +143,28 @@ export default function Frequencia() {
                     <option key={a.id} value={a.id}>{a.ano}</option>
                   ))}
                 </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col xs={12} md={4}>
+              <Form.Group>
+                <Form.Label className="small fw-medium">Turma</Form.Label>
+                {loadingTurmas ? (
+                  <div className="d-flex align-items-center gap-2 pt-1">
+                    <Spinner size="sm" variant="secondary" />
+                    <small className="text-muted">Carregando...</small>
+                  </div>
+                ) : (
+                  <Form.Select
+                    value={turmaSelecionada}
+                    onChange={(e) => setTurmaSelecionada(e.target.value)}
+                    disabled={!anoLetivoSelecionado || turmas.length === 0}
+                  >
+                    <option value="">Selecione a turma</option>
+                    {turmas.map((t) => (
+                      <option key={t.id} value={t.id}>{t.nome}</option>
+                    ))}
+                  </Form.Select>
+                )}
               </Form.Group>
             </Col>
             <Col xs={12} md={3}>
@@ -159,7 +184,7 @@ export default function Frequencia() {
       {!turmaSelecionada ? (
         <Card className="border-0 shadow-sm">
           <Card.Body className="text-center p-5 text-muted small">
-            Selecione uma turma para registrar a frequência.
+            Selecione o ano letivo e a turma para registrar a frequência.
           </Card.Body>
         </Card>
       ) : loadingAlunos ? (
@@ -208,7 +233,7 @@ export default function Frequencia() {
                     size="sm"
                     variant="primary"
                     onClick={handleSave}
-                    disabled={saving || !anoLetivoSelecionado}
+                    disabled={saving}
                   >
                     {saving && <Spinner size="sm" className="me-1" />}
                     Salvar

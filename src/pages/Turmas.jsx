@@ -60,7 +60,7 @@ export default function Turmas() {
     setLoading(true);
     try {
       const { data } = await getTurmasByAnoLetivo(anoLetivoFiltro);
-      setItems(Array.isArray(data) ? data : data.data ?? []);
+      setItems(Array.isArray(data) ? data : (data.data ?? []));
     } catch {
       setItems([]);
     } finally {
@@ -125,7 +125,11 @@ export default function Turmas() {
   }
 
   if (loadingSelects) {
-    return <div className="text-center p-5"><Spinner variant="primary" /></div>;
+    return (
+      <div className="text-center p-5">
+        <Spinner variant="primary" />
+      </div>
+    );
   }
 
   return (
@@ -137,6 +141,7 @@ export default function Turmas() {
         </div>
         <Button
           variant="primary"
+          className="d-flex align-items-center justify-content-between"
           onClick={openCreate}
           disabled={anosLetivos.length === 0}
         >
@@ -162,7 +167,9 @@ export default function Turmas() {
             >
               <option value="">Selecione</option>
               {anosLetivos.map((a) => (
-                <option key={a.id} value={a.id}>{a.ano}</option>
+                <option key={a.id} value={a.id}>
+                  {a.ano}
+                </option>
               ))}
             </Form.Select>
           </Form.Group>
@@ -271,7 +278,9 @@ export default function Turmas() {
               </Col>
               <Col xs={6}>
                 <Form.Group>
-                  <Form.Label className="small fw-medium">Ano Letivo</Form.Label>
+                  <Form.Label className="small fw-medium">
+                    Ano Letivo
+                  </Form.Label>
                   <Form.Select
                     value={form.anoLetivoId}
                     onChange={(e) => set("anoLetivoId", e.target.value)}

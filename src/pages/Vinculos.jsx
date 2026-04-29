@@ -16,7 +16,7 @@ import {
   createVinculo,
   deleteVinculo,
 } from "../api/vinculos";
-import { getTurmas } from "../api/turmas";
+import { getTurmasByAnoLetivo } from "../api/turmas";
 import { getDisciplinas } from "../api/disciplinas";
 import { getAllUsuarios } from "../api/usuarios";
 import { getAnoLetivos } from "../api/anoLetivo";
@@ -30,56 +30,76 @@ const defaultForm = {
 };
 
 export default function Vinculos() {
-  const [vinculos, setVinculos] = useState([]);
-  const [loadingVinculos, setLoadingVinculos] = useState(false);
-  const [turmaSelecionada, setTurmaSelecionada] = useState("");
+  const [anosLetivos, setAnosLetivos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [disciplinas, setDisciplinas] = useState([]);
   const [professores, setProfessores] = useState([]);
-  const [anosLetivos, setAnosLetivos] = useState([]);
+
+  const [anoLetivoFiltro, setAnoLetivoFiltro] = useState("");
+  const [turmaSelecionada, setTurmaSelecionada] = useState("");
+
+  const [vinculos, setVinculos] = useState([]);
+
   const [loadingSelects, setLoadingSelects] = useState(true);
+  const [loadingTurmas, setLoadingTurmas] = useState(false);
+  const [loadingVinculos, setLoadingVinculos] = useState(false);
+
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Mount: anos letivos, disciplinas e professores (independentes de filtro)
   useEffect(() => {
-    loadSelects();
+    Promise.all([getAnoLetivos(), getDisciplinas(), getAllUsuarios()])
+      .then(([anosRes, discRes, usuariosRes]) => {
+        const anos = anosRes.data.data;
+        setAnosLetivos(anos);
+        setDisciplinas(discRes.data.data);
+        setProfessores(
+          usuariosRes.data.data.filter((u) => u.role === ROLES.Professor),
+        );
+        if (anos.length > 0) setAnoLetivoFiltro(String(anos[0].id));
+      })
+      .finally(() => setLoadingSelects(false));
   }, []);
 
+  // Ano letivo → turmas
   useEffect(() => {
-    if (turmaSelecionada) loadVinculos(turmaSelecionada);
-    else setVinculos([]);
+    setTurmas([]);
+    setTurmaSelecionada("");
+    setVinculos([]);
+    if (!anoLetivoFiltro) return;
+
+    setLoadingTurmas(true);
+    getTurmasByAnoLetivo(anoLetivoFiltro)
+      .then(({ data }) =>
+        setTurmas(Array.isArray(data) ? data : (data.data ?? [])),
+      )
+      .catch(() => setTurmas([]))
+      .finally(() => setLoadingTurmas(false));
+  }, [anoLetivoFiltro]);
+
+  // Turma → vínculos
+  useEffect(() => {
+    setVinculos([]);
+    if (!turmaSelecionada) return;
+
+    setLoadingVinculos(true);
+    getVinculosByTurma(turmaSelecionada)
+      .then(({ data }) =>
+        setVinculos(Array.isArray(data) ? data : (data.data ?? [])),
+      )
+      .catch(() => setVinculos([]))
+      .finally(() => setLoadingVinculos(false));
   }, [turmaSelecionada]);
 
-  async function loadSelects() {
-    setLoadingSelects(true);
-    try {
-      const [turmasRes, disciplinasRes, usuariosRes, anosRes] =
-        await Promise.all([
-          getTurmas(),
-          getDisciplinas(),
-          getAllUsuarios(),
-          getAnoLetivos(),
-        ]);
-      setTurmas(turmasRes.data.data);
-      setDisciplinas(disciplinasRes.data.data);
-      setProfessores(
-        usuariosRes.data.data.filter((u) => u.role === ROLES.Professor),
-      );
-      setAnosLetivos(anosRes.data.data);
-    } finally {
-      setLoadingSelects(false);
-    }
-  }
-
-  async function loadVinculos(turmaId) {
+  async function reload() {
+    if (!turmaSelecionada) return;
     setLoadingVinculos(true);
     try {
-      const { data } = await getVinculosByTurma(turmaId);
-      setVinculos(data);
-    } catch {
-      setVinculos([]);
+      const { data } = await getVinculosByTurma(turmaSelecionada);
+      setVinculos(Array.isArray(data) ? data : (data.data ?? []));
     } finally {
       setLoadingVinculos(false);
     }
@@ -91,10 +111,10 @@ export default function Vinculos() {
 
   function openCreate() {
     setForm({
-      turmaId: turmaSelecionada || turmas[0]?.id || "",
-      disciplinaId: disciplinas[0]?.id || "",
-      professorId: professores[0]?.id || "",
-      anoLetivoId: anosLetivos[0]?.id || "",
+      turmaId: turmaSelecionada,
+      disciplinaId: disciplinas[0]?.id ?? "",
+      professorId: professores[0]?.id ?? "",
+      anoLetivoId: anoLetivoFiltro,
     });
     setError("");
     setShowModal(true);
@@ -112,7 +132,7 @@ export default function Vinculos() {
         anoLetivoId: Number(form.anoLetivoId),
       });
       setShowModal(false);
-      if (turmaSelecionada) loadVinculos(turmaSelecionada);
+      reload();
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -127,7 +147,7 @@ export default function Vinculos() {
     if (!confirm("Confirmar remoção do vínculo?")) return;
     try {
       await deleteVinculo(id);
-      if (turmaSelecionada) loadVinculos(turmaSelecionada);
+      reload();
     } catch {
       alert("Erro ao remover.");
     }
@@ -151,15 +171,16 @@ export default function Vinculos() {
           </h5>
         </div>
         <Button
-          size="md"
           variant="primary"
+          className="d-flex align-items-center justify-content-between"
           onClick={openCreate}
           disabled={
-            turmas.length === 0 ||
+            !turmaSelecionada ||
             disciplinas.length === 0 ||
             professores.length === 0
           }
         >
+          <Plus size={14} className="me-1" />
           Novo Vínculo
         </Button>
       </div>
@@ -173,25 +194,46 @@ export default function Vinculos() {
 
       <Card className="border-0 shadow-sm mb-3">
         <Card.Body className="py-3 px-4">
-          <Row className="align-items-center g-2">
-            <Col xs="auto">
-              <small className="fw-medium text-slate-700">
-                Filtrar por turma:
-              </small>
+          <Row className="g-3 align-items-end">
+            <Col xs={12} md={4}>
+              <Form.Group>
+                <Form.Label className="small fw-medium">Ano Letivo</Form.Label>
+                <Form.Select
+                  value={anoLetivoFiltro}
+                  onChange={(e) => setAnoLetivoFiltro(e.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {anosLetivos.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.ano}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
             </Col>
             <Col xs={12} md={4}>
-              <Form.Select
-                size="sm"
-                value={turmaSelecionada}
-                onChange={(e) => setTurmaSelecionada(e.target.value)}
-              >
-                <option value="">Selecione uma turma</option>
-                {turmas.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nome}
-                  </option>
-                ))}
-              </Form.Select>
+              <Form.Group>
+                <Form.Label className="small fw-medium">Turma</Form.Label>
+                {loadingTurmas ? (
+                  <div className="d-flex align-items-center gap-2 pt-1">
+                    <Spinner size="sm" variant="secondary" />
+                    <small className="text-muted">Carregando...</small>
+                  </div>
+                ) : (
+                  <Form.Select
+                    value={turmaSelecionada}
+                    onChange={(e) => setTurmaSelecionada(e.target.value)}
+                    disabled={!anoLetivoFiltro || turmas.length === 0}
+                  >
+                    <option value="">Selecione a turma</option>
+                    {turmas.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nome}
+                      </option>
+                    ))}
+                  </Form.Select>
+                )}
+              </Form.Group>
             </Col>
           </Row>
         </Card.Body>
@@ -201,7 +243,7 @@ export default function Vinculos() {
         <Card.Body className="p-0">
           {!turmaSelecionada ? (
             <p className="text-muted text-center p-5 mb-0 small">
-              Selecione uma turma para ver os vínculos.
+              Selecione o ano letivo e a turma para ver os vínculos.
             </p>
           ) : loadingVinculos ? (
             <div className="text-center p-5">
@@ -217,7 +259,6 @@ export default function Vinculos() {
                 <tr>
                   <th className="ps-4">Disciplina</th>
                   <th>Professor</th>
-                  <th>Ano Letivo</th>
                   <th style={{ width: 80 }}>Ações</th>
                 </tr>
               </thead>
@@ -226,7 +267,6 @@ export default function Vinculos() {
                   <tr key={item.id}>
                     <td className="ps-4 fw-medium">{item.disciplinaNome}</td>
                     <td>{item.professorNome}</td>
-                    <td>{item.anoLetivo}</td>
                     <td>
                       <Button
                         size="sm"

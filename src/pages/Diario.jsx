@@ -12,7 +12,7 @@ import {
 } from "react-bootstrap";
 import { FileText, Printer } from "lucide-react";
 import { getDiarioMaternal, getDiarioFundamental } from "../api/diario";
-import { getTurmas } from "../api/turmas";
+import { getTurmasByAnoLetivo } from "../api/turmas";
 import { getAnoLetivos } from "../api/anoLetivo";
 import { getAlunosByTurma } from "../api/alunos";
 import { SEGMENTOS, SEGMENTO_LABELS } from "../utils/constants";
@@ -208,73 +208,85 @@ function DesenvolvimentosMaternal({ desenvolvimentos }) {
 }
 
 export default function Diario() {
-  const [turmas, setTurmas] = useState([]);
   const [anosLetivos, setAnosLetivos] = useState([]);
+  const [turmas, setTurmas] = useState([]);
   const [alunos, setAlunos] = useState([]);
-  const [turmaSelecionada, setTurmaSelecionada] = useState("");
+
   const [anoLetivoSelecionado, setAnoLetivoSelecionado] = useState("");
+  const [turmaSelecionada, setTurmaSelecionada] = useState("");
   const [alunoSelecionado, setAlunoSelecionado] = useState("");
+
   const [diario, setDiario] = useState(null);
+  const [segmento, setSegmento] = useState(null);
+
   const [loadingSelects, setLoadingSelects] = useState(true);
+  const [loadingTurmas, setLoadingTurmas] = useState(false);
   const [loadingAlunos, setLoadingAlunos] = useState(false);
   const [loadingDiario, setLoadingDiario] = useState(false);
   const [erro, setErro] = useState("");
 
+  // Mount: anos letivos
   useEffect(() => {
-    Promise.all([getTurmas(), getAnoLetivos()])
-      .then(([t, a]) => {
-        setTurmas(t.data.data);
-        setAnosLetivos(a.data.data);
-        if (a.data.data.length > 0)
-          setAnoLetivoSelecionado(String(a.data.data[0].id));
+    getAnoLetivos()
+      .then(({ data }) => {
+        setAnosLetivos(data.data);
+        if (data.data.length > 0) setAnoLetivoSelecionado(String(data.data[0].id));
       })
       .finally(() => setLoadingSelects(false));
   }, []);
 
+  // Ano letivo → turmas
+  useEffect(() => {
+    setTurmas([]);
+    setTurmaSelecionada("");
+    setAlunos([]);
+    setAlunoSelecionado("");
+    setDiario(null);
+    setSegmento(null);
+    if (!anoLetivoSelecionado) return;
+
+    setLoadingTurmas(true);
+    getTurmasByAnoLetivo(anoLetivoSelecionado)
+      .then(({ data }) => setTurmas(Array.isArray(data) ? data : data.data ?? []))
+      .catch(() => setTurmas([]))
+      .finally(() => setLoadingTurmas(false));
+  }, [anoLetivoSelecionado]);
+
+  // Turma → alunos
   useEffect(() => {
     setAlunos([]);
     setAlunoSelecionado("");
     setDiario(null);
+    setErro("");
     if (!turmaSelecionada) return;
+
+    const turma = turmas.find((t) => String(t.id) === String(turmaSelecionada));
+    setSegmento(turma?.segmento ?? null);
 
     setLoadingAlunos(true);
     getAlunosByTurma(turmaSelecionada)
       .then(({ data }) => setAlunos(data))
       .catch(() => setAlunos([]))
       .finally(() => setLoadingAlunos(false));
-  }, [turmaSelecionada]);
+  }, [turmaSelecionada, turmas]);
 
+  // Aluno → diário
   useEffect(() => {
     setDiario(null);
     setErro("");
-    if (!alunoSelecionado || !anoLetivoSelecionado) return;
+    if (!alunoSelecionado || !anoLetivoSelecionado || segmento == null) return;
 
-    const turma = turmas.find((t) => String(t.id) === String(turmaSelecionada));
-    if (!turma) return;
-
-    const loadFn =
-      turma.segmento === SEGMENTOS.Maternal
-        ? getDiarioMaternal
-        : getDiarioFundamental;
+    const loadFn = segmento === SEGMENTOS.Maternal ? getDiarioMaternal : getDiarioFundamental;
 
     setLoadingDiario(true);
     loadFn(alunoSelecionado, anoLetivoSelecionado)
       .then(({ data }) => setDiario(data))
       .catch(() => setErro("Não foi possível carregar o diário."))
       .finally(() => setLoadingDiario(false));
-  }, [alunoSelecionado, anoLetivoSelecionado]);
-
-  const turmaAtual = turmas.find(
-    (t) => String(t.id) === String(turmaSelecionada),
-  );
-  const segmento = turmaAtual?.segmento;
+  }, [alunoSelecionado, anoLetivoSelecionado, segmento]);
 
   if (loadingSelects) {
-    return (
-      <div className="text-center p-5">
-        <Spinner variant="primary" />
-      </div>
-    );
+    return <div className="text-center p-5"><Spinner variant="primary" /></div>;
   }
 
   return (
@@ -288,7 +300,6 @@ export default function Diario() {
           <Button
             size="sm"
             variant="outline-success"
-            className="d-flex align-items-center justify-content-between"
             onClick={() => window.print()}
           >
             <Printer size={14} className="me-1" />
@@ -300,22 +311,6 @@ export default function Diario() {
       <Card className="border-0 shadow-sm mb-3">
         <Card.Body className="py-3 px-4">
           <Row className="g-3 align-items-end">
-            <Col xs={12} md={4}>
-              <Form.Group>
-                <Form.Label className="small fw-medium">Turma</Form.Label>
-                <Form.Select
-                  value={turmaSelecionada}
-                  onChange={(e) => setTurmaSelecionada(e.target.value)}
-                >
-                  <option value="">Selecione a turma</option>
-                  {turmas.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.nome} — {SEGMENTO_LABELS[t.segmento]}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-            </Col>
             <Col xs={12} md={3}>
               <Form.Group>
                 <Form.Label className="small fw-medium">Ano Letivo</Form.Label>
@@ -325,11 +320,33 @@ export default function Diario() {
                 >
                   <option value="">Selecione</option>
                   {anosLetivos.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.ano}
-                    </option>
+                    <option key={a.id} value={a.id}>{a.ano}</option>
                   ))}
                 </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col xs={12} md={4}>
+              <Form.Group>
+                <Form.Label className="small fw-medium">Turma</Form.Label>
+                {loadingTurmas ? (
+                  <div className="d-flex align-items-center gap-2 pt-1">
+                    <Spinner size="sm" variant="secondary" />
+                    <small className="text-muted">Carregando...</small>
+                  </div>
+                ) : (
+                  <Form.Select
+                    value={turmaSelecionada}
+                    onChange={(e) => setTurmaSelecionada(e.target.value)}
+                    disabled={!anoLetivoSelecionado || turmas.length === 0}
+                  >
+                    <option value="">Selecione a turma</option>
+                    {turmas.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nome} — {SEGMENTO_LABELS[t.segmento]}
+                      </option>
+                    ))}
+                  </Form.Select>
+                )}
               </Form.Group>
             </Col>
             <Col xs={12} md={4}>
@@ -344,7 +361,7 @@ export default function Diario() {
                   <Form.Select
                     value={alunoSelecionado}
                     onChange={(e) => setAlunoSelecionado(e.target.value)}
-                    disabled={!turmaSelecionada}
+                    disabled={!turmaSelecionada || alunos.length === 0}
                   >
                     <option value="">Selecione o aluno</option>
                     {alunos.map((a) => (
@@ -363,17 +380,13 @@ export default function Diario() {
       {!alunoSelecionado ? (
         <Card className="border-0 shadow-sm">
           <Card.Body className="text-center p-5 text-muted small">
-            Selecione turma e aluno para visualizar o diário.
+            Selecione ano letivo, turma e aluno para visualizar o diário.
           </Card.Body>
         </Card>
       ) : loadingDiario ? (
-        <div className="text-center p-5">
-          <Spinner variant="primary" />
-        </div>
+        <div className="text-center p-5"><Spinner variant="primary" /></div>
       ) : erro ? (
-        <Alert variant="danger" className="py-2 small">
-          {erro}
-        </Alert>
+        <Alert variant="danger" className="py-2 small">{erro}</Alert>
       ) : diario ? (
         <div id="diario-content">
           <Card className="border-0 shadow-sm mb-3">
@@ -382,26 +395,15 @@ export default function Diario() {
                 <Col xs={12} md={6}>
                   <p className="fw-bold fs-6 mb-1">{diario.alunoNome}</p>
                   <p className="text-muted small mb-0">
-                    Nº {diario.numeroChamada} · {diario.turmaNome} ·{" "}
-                    {diario.anoLetivo}
+                    Nº {diario.numeroChamada} · {diario.turmaNome} · {diario.anoLetivo}
                   </p>
                 </Col>
-                <Col
-                  xs={12}
-                  md={6}
-                  className="d-flex align-items-center justify-content-md-end gap-2"
-                >
-                  <Badge
-                    bg={segmento === SEGMENTOS.Maternal ? "warning" : "primary"}
-                  >
+                <Col xs={12} md={6} className="d-flex align-items-center justify-content-md-end gap-2">
+                  <Badge bg={segmento === SEGMENTOS.Maternal ? "warning" : "primary"}>
                     {SEGMENTO_LABELS[segmento]}
                   </Badge>
                   {diario.resultado && (
-                    <Badge
-                      bg={
-                        diario.resultado === "Aprovado" ? "success" : "danger"
-                      }
-                    >
+                    <Badge bg={diario.resultado === "Aprovado" ? "success" : "danger"}>
                       {diario.resultado}
                     </Badge>
                   )}
@@ -413,16 +415,11 @@ export default function Diario() {
           <FrequenciaSection frequencia={diario.frequencia} />
 
           {segmento === SEGMENTOS.Fundamental && (
-            <NotasFundamental
-              notas={diario.notas}
-              resultado={diario.resultado}
-            />
+            <NotasFundamental notas={diario.notas} resultado={diario.resultado} />
           )}
 
           {segmento === SEGMENTOS.Maternal && (
-            <DesenvolvimentosMaternal
-              desenvolvimentos={diario.desenvolvimentos}
-            />
+            <DesenvolvimentosMaternal desenvolvimentos={diario.desenvolvimentos} />
           )}
         </div>
       ) : null}

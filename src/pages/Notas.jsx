@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, Table, Button, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
 import { Star } from 'lucide-react';
 import { getNotasByTurmaDisciplinaAno, lancaNota } from '../api/notas';
-import { getTurmas } from '../api/turmas';
+import { getTurmasByAnoLetivo } from '../api/turmas';
 import { getDisciplinas } from '../api/disciplinas';
 import { getAnoLetivos } from '../api/anoLetivo';
 import { getAlunosByTurma } from '../api/alunos';
@@ -18,33 +18,55 @@ const UNIDADES = [
 ];
 
 export default function Notas() {
+  const [anosLetivos, setAnosLetivos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [disciplinas, setDisciplinas] = useState([]);
-  const [anosLetivos, setAnosLetivos] = useState([]);
+
+  const [anoLetivoSelecionado, setAnoLetivoSelecionado] = useState('');
   const [turmaSelecionada, setTurmaSelecionada] = useState('');
   const [disciplinaSelecionada, setDisciplinaSelecionada] = useState('');
-  const [anoLetivoSelecionado, setAnoLetivoSelecionado] = useState('');
   const [unidade, setUnidade] = useState('1');
+
   const [alunos, setAlunos] = useState([]);
   const [notasInput, setNotasInput] = useState({});
+
   const [loadingSelects, setLoadingSelects] = useState(true);
+  const [loadingTurmas, setLoadingTurmas] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
 
+  // Mount: anos letivos e disciplinas
   useEffect(() => {
-    Promise.all([getTurmas(), getDisciplinas(), getAnoLetivos()])
-      .then(([t, d, a]) => {
-        setTurmas(t.data.data);
-        setDisciplinas(d.data.data);
-        setAnosLetivos(a.data.data);
-        if (d.data.data.length > 0) setDisciplinaSelecionada(String(d.data.data[0].id));
-        if (a.data.data.length > 0) setAnoLetivoSelecionado(String(a.data.data[0].id));
+    Promise.all([getAnoLetivos(), getDisciplinas()])
+      .then(([anosRes, discRes]) => {
+        const anos = anosRes.data.data;
+        const discs = discRes.data.data;
+        setAnosLetivos(anos);
+        setDisciplinas(discs);
+        if (anos.length > 0) setAnoLetivoSelecionado(String(anos[0].id));
+        if (discs.length > 0) setDisciplinaSelecionada(String(discs[0].id));
       })
       .finally(() => setLoadingSelects(false));
   }, []);
 
+  // Ano letivo → turmas
+  useEffect(() => {
+    setTurmas([]);
+    setTurmaSelecionada('');
+    setAlunos([]);
+    setNotasInput({});
+    if (!anoLetivoSelecionado) return;
+
+    setLoadingTurmas(true);
+    getTurmasByAnoLetivo(anoLetivoSelecionado)
+      .then(({ data }) => setTurmas(Array.isArray(data) ? data : data.data ?? []))
+      .catch(() => setTurmas([]))
+      .finally(() => setLoadingTurmas(false));
+  }, [anoLetivoSelecionado]);
+
+  // Turma + disciplina + unidade → alunos + notas
   useEffect(() => {
     if (!turmaSelecionada || !disciplinaSelecionada || !anoLetivoSelecionado) return;
 
@@ -138,16 +160,38 @@ export default function Notas() {
           <Row className="g-3 align-items-end">
             <Col xs={12} md={3}>
               <Form.Group>
-                <Form.Label className="small fw-medium">Turma</Form.Label>
+                <Form.Label className="small fw-medium">Ano Letivo</Form.Label>
                 <Form.Select
-                  value={turmaSelecionada}
-                  onChange={(e) => setTurmaSelecionada(e.target.value)}
+                  value={anoLetivoSelecionado}
+                  onChange={(e) => setAnoLetivoSelecionado(e.target.value)}
                 >
-                  <option value="">Selecione a turma</option>
-                  {turmas.map((t) => (
-                    <option key={t.id} value={t.id}>{t.nome}</option>
+                  <option value="">Selecione</option>
+                  {anosLetivos.map((a) => (
+                    <option key={a.id} value={a.id}>{a.ano}</option>
                   ))}
                 </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col xs={12} md={3}>
+              <Form.Group>
+                <Form.Label className="small fw-medium">Turma</Form.Label>
+                {loadingTurmas ? (
+                  <div className="d-flex align-items-center gap-2 pt-1">
+                    <Spinner size="sm" variant="secondary" />
+                    <small className="text-muted">Carregando...</small>
+                  </div>
+                ) : (
+                  <Form.Select
+                    value={turmaSelecionada}
+                    onChange={(e) => setTurmaSelecionada(e.target.value)}
+                    disabled={!anoLetivoSelecionado || turmas.length === 0}
+                  >
+                    <option value="">Selecione a turma</option>
+                    {turmas.map((t) => (
+                      <option key={t.id} value={t.id}>{t.nome}</option>
+                    ))}
+                  </Form.Select>
+                )}
               </Form.Group>
             </Col>
             <Col xs={12} md={3}>
@@ -160,20 +204,6 @@ export default function Notas() {
                   <option value="">Selecione</option>
                   {disciplinas.map((d) => (
                     <option key={d.id} value={d.id}>{d.nome}</option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col xs={12} md={3}>
-              <Form.Group>
-                <Form.Label className="small fw-medium">Ano Letivo</Form.Label>
-                <Form.Select
-                  value={anoLetivoSelecionado}
-                  onChange={(e) => setAnoLetivoSelecionado(e.target.value)}
-                >
-                  <option value="">Selecione</option>
-                  {anosLetivos.map((a) => (
-                    <option key={a.id} value={a.id}>{a.ano}</option>
                   ))}
                 </Form.Select>
               </Form.Group>
@@ -195,7 +225,7 @@ export default function Notas() {
       {!prontoParaLancar ? (
         <Card className="border-0 shadow-sm">
           <Card.Body className="text-center p-5 text-muted small">
-            Selecione turma, disciplina e ano letivo para lançar as notas.
+            Selecione ano letivo, turma e disciplina para lançar as notas.
           </Card.Body>
         </Card>
       ) : loading ? (

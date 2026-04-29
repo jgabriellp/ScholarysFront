@@ -12,12 +12,12 @@ import {
 } from "react-bootstrap";
 import { GraduationCap, Plus, Pencil, Trash2 } from "lucide-react";
 import {
-  getAlunos,
+  getAlunosByTurma,
   createAluno,
   updateAluno,
   deleteAluno,
 } from "../api/alunos";
-import { getTurmas } from "../api/turmas";
+import { getTurmasByAnoLetivo } from "../api/turmas";
 import { getAllUsuarios } from "../api/usuarios";
 import { getAnoLetivos } from "../api/anoLetivo";
 import { ROLES } from "../utils/constants";
@@ -32,54 +32,75 @@ const defaultForm = {
 };
 
 export default function Alunos() {
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [turmas, setTurmas] = useState([]);
   const [anosLetivos, setAnosLetivos] = useState([]);
+  const [turmas, setTurmas] = useState([]);
   const [usuariosAluno, setUsuariosAluno] = useState([]);
+
+  const [anoLetivoFiltro, setAnoLetivoFiltro] = useState("");
+  const [turmaSelecionada, setTurmaSelecionada] = useState("");
+
+  const [items, setItems] = useState([]);
+
+  const [loadingSelects, setLoadingSelects] = useState(true);
+  const [loadingTurmas, setLoadingTurmas] = useState(false);
+  const [loadingAlunos, setLoadingAlunos] = useState(false);
+
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const pageSize = 10;
-
+  // Carrega anos letivos e usuários aluno no mount
   useEffect(() => {
-    loadSelects();
+    Promise.all([getAnoLetivos(), getAllUsuarios()])
+      .then(([anosRes, usuariosRes]) => {
+        const anos = anosRes.data.data;
+        setAnosLetivos(anos);
+        setUsuariosAluno(
+          usuariosRes.data.data.filter((u) => u.role === ROLES.Aluno),
+        );
+        if (anos.length > 0) setAnoLetivoFiltro(String(anos[0].id));
+      })
+      .finally(() => setLoadingSelects(false));
   }, []);
 
+  // Quando o ano letivo muda, busca as turmas dele e limpa a turma selecionada
   useEffect(() => {
-    load();
-  }, [page]);
+    setTurmas([]);
+    setTurmaSelecionada("");
+    setItems([]);
+    if (!anoLetivoFiltro) return;
 
-  async function loadSelects() {
-    try {
-      const [turmasRes, anosRes, usuariosRes] = await Promise.all([
-        getTurmas(),
-        getAnoLetivos(),
-        getAllUsuarios(),
-      ]);
-      setTurmas(turmasRes.data.data);
-      setAnosLetivos(anosRes.data.data);
-      setUsuariosAluno(
-        usuariosRes.data.data.filter((u) => u.role === ROLES.Aluno),
-      );
-    } catch {
-      /* silencioso */
-    }
-  }
+    setLoadingTurmas(true);
+    getTurmasByAnoLetivo(anoLetivoFiltro)
+      .then(({ data }) =>
+        setTurmas(Array.isArray(data) ? data : (data.data ?? [])),
+      )
+      .catch(() => setTurmas([]))
+      .finally(() => setLoadingTurmas(false));
+  }, [anoLetivoFiltro]);
+
+  // Quando a turma muda, busca os alunos dela
+  useEffect(() => {
+    setItems([]);
+    if (!turmaSelecionada) return;
+
+    setLoadingAlunos(true);
+    getAlunosByTurma(turmaSelecionada)
+      .then(({ data }) => setItems(data))
+      .catch(() => setItems([]))
+      .finally(() => setLoadingAlunos(false));
+  }, [turmaSelecionada]);
 
   async function load() {
-    setLoading(true);
+    if (!turmaSelecionada) return;
+    setLoadingAlunos(true);
     try {
-      const { data } = await getAlunos(page, pageSize);
-      setItems(data.data);
-      setTotal(data.total);
+      const { data } = await getAlunosByTurma(turmaSelecionada);
+      setItems(data);
     } finally {
-      setLoading(false);
+      setLoadingAlunos(false);
     }
   }
 
@@ -91,8 +112,8 @@ export default function Alunos() {
     setEditItem(null);
     setForm({
       ...defaultForm,
-      turmaId: turmas[0]?.id ?? "",
-      anoLetivoId: anosLetivos[0]?.id ?? "",
+      anoLetivoId: anoLetivoFiltro,
+      turmaId: turmaSelecionada,
     });
     setError("");
     setShowModal(true);
@@ -149,7 +170,13 @@ export default function Alunos() {
     }
   }
 
-  const hasDependencies = turmas.length > 0 && anosLetivos.length > 0;
+  if (loadingSelects) {
+    return (
+      <div className="text-center p-5">
+        <Spinner variant="primary" />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -159,38 +186,90 @@ export default function Alunos() {
           <h5 className="fw-bold text-slate-800 mb-0">Alunos</h5>
         </div>
         <Button
-          size="md"
           variant="primary"
+          className="d-flex align-items-center justify-content-between"
           onClick={openCreate}
-          disabled={!hasDependencies}
+          disabled={!turmaSelecionada}
         >
+          <Plus size={14} className="me-1" />
           Novo Aluno
         </Button>
       </div>
 
-      {!hasDependencies && !loading && (
+      {anosLetivos.length === 0 && (
         <Alert variant="warning" className="small py-2 mb-3">
-          Cadastre <strong>Ano Letivo</strong> e <strong>Turmas</strong> antes
-          de criar alunos.
+          Cadastre um <strong>Ano Letivo</strong> e <strong>Turmas</strong>{" "}
+          antes de criar alunos.
         </Alert>
       )}
 
-      {hasDependencies && usuariosAluno.length === 0 && !loading && (
+      {turmaSelecionada && usuariosAluno.length === 0 && (
         <Alert variant="info" className="small py-2 mb-3">
           Nenhum usuário com perfil <strong>Aluno</strong> encontrado. Crie um
-          usuário com perfil Aluno em <strong>Usuários</strong> primeiro.
+          em <strong>Usuários</strong> antes de cadastrar alunos.
         </Alert>
       )}
+
+      <Card className="border-0 shadow-sm mb-3">
+        <Card.Body className="py-3 px-4">
+          <Row className="g-3 align-items-end">
+            <Col xs={12} md={4}>
+              <Form.Group>
+                <Form.Label className="small fw-medium">Ano Letivo</Form.Label>
+                <Form.Select
+                  value={anoLetivoFiltro}
+                  onChange={(e) => setAnoLetivoFiltro(e.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {anosLetivos.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.ano}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col xs={12} md={4}>
+              <Form.Group>
+                <Form.Label className="small fw-medium">Turma</Form.Label>
+                {loadingTurmas ? (
+                  <div className="d-flex align-items-center gap-2 pt-1">
+                    <Spinner size="sm" variant="secondary" />
+                    <small className="text-muted">Carregando...</small>
+                  </div>
+                ) : (
+                  <Form.Select
+                    value={turmaSelecionada}
+                    onChange={(e) => setTurmaSelecionada(e.target.value)}
+                    disabled={!anoLetivoFiltro || turmas.length === 0}
+                  >
+                    <option value="">Selecione a turma</option>
+                    {turmas.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nome}
+                      </option>
+                    ))}
+                  </Form.Select>
+                )}
+              </Form.Group>
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
 
       <Card className="border-0 shadow-sm">
         <Card.Body className="p-0">
-          {loading ? (
+          {!turmaSelecionada ? (
+            <p className="text-muted text-center p-5 mb-0 small">
+              Selecione o ano letivo e a turma para ver os alunos.
+            </p>
+          ) : loadingAlunos ? (
             <div className="text-center p-5">
               <Spinner variant="primary" />
             </div>
           ) : items.length === 0 ? (
             <p className="text-muted text-center p-5 mb-0 small">
-              Nenhum aluno cadastrado.
+              Nenhum aluno cadastrado nesta turma.
             </p>
           ) : (
             <Table hover responsive className="mb-0">
@@ -200,8 +279,6 @@ export default function Alunos() {
                     Nº
                   </th>
                   <th>Nome</th>
-                  <th>Turma</th>
-                  <th>Ano Letivo</th>
                   <th>Nascimento</th>
                   <th style={{ width: 100 }}>Ações</th>
                 </tr>
@@ -211,8 +288,6 @@ export default function Alunos() {
                   <tr key={item.id}>
                     <td className="ps-4 text-muted">{item.numeroChamada}</td>
                     <td className="fw-medium">{item.nome}</td>
-                    <td className="small">{item.turmaNome}</td>
-                    <td className="small">{item.anoLetivo}</td>
                     <td className="small text-muted">{item.dataNascimento}</td>
                     <td>
                       <div className="d-flex gap-1">
@@ -238,29 +313,6 @@ export default function Alunos() {
             </Table>
           )}
         </Card.Body>
-        {total > pageSize && (
-          <Card.Footer className="d-flex justify-content-between align-items-center py-2 px-4 bg-white border-top">
-            <small className="text-muted">{total} registros</small>
-            <div className="d-flex gap-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                Anterior
-              </Button>
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                disabled={page * pageSize >= total}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Próximo
-              </Button>
-            </div>
-          </Card.Footer>
-        )}
       </Card>
 
       <Modal
@@ -323,23 +375,6 @@ export default function Alunos() {
               </Col>
               <Col xs={12} md={4}>
                 <Form.Group>
-                  <Form.Label className="small fw-medium">Turma</Form.Label>
-                  <Form.Select
-                    value={form.turmaId}
-                    onChange={(e) => set("turmaId", e.target.value)}
-                    required
-                  >
-                    <option value="">Selecione</option>
-                    {turmas.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.nome}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col xs={12} md={4}>
-                <Form.Group>
                   <Form.Label className="small fw-medium">
                     Ano Letivo
                   </Form.Label>
@@ -352,6 +387,23 @@ export default function Alunos() {
                     {anosLetivos.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.ano}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col xs={12} md={4}>
+                <Form.Group>
+                  <Form.Label className="small fw-medium">Turma</Form.Label>
+                  <Form.Select
+                    value={form.turmaId}
+                    onChange={(e) => set("turmaId", e.target.value)}
+                    required
+                  >
+                    <option value="">Selecione</option>
+                    {turmas.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nome}
                       </option>
                     ))}
                   </Form.Select>
