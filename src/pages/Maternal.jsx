@@ -2,15 +2,17 @@ import { useState, useEffect } from 'react';
 import { Card, Button, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
 import { Baby } from 'lucide-react';
 import { getDesenvolvimentoByAlunoAno, lancaDesenvolvimento } from '../api/desenvolvimentoMaternal';
-import { getTurmasByAnoLetivo } from '../api/turmas';
-import { getAnoLetivos } from '../api/anoLetivo';
+import { getTurmasByAnoLetivo, getTurmasByProfessor } from '../api/turmas';
+import { getAnosLetivosAccessivel } from '../api/anoLetivo';
 import { getAlunosByTurma } from '../api/alunos';
-import { SEGMENTOS } from '../utils/constants';
+import { useAuth } from '../contexts/AuthContext';
+import { ROLES, SEGMENTOS } from '../utils/constants';
 
 const BIMESTRES = [1, 2, 3, 4];
 const defaultBimestres = { 1: '', 2: '', 3: '', 4: '' };
 
 export default function Maternal() {
+  const { user } = useAuth();
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [alunos, setAlunos] = useState([]);
@@ -31,10 +33,10 @@ export default function Maternal() {
 
   // Mount: carrega anos letivos
   useEffect(() => {
-    getAnoLetivos()
-      .then(({ data }) => {
-        setAnosLetivos(data.data);
-        if (data.data.length > 0) setAnoLetivoSelecionado(String(data.data[0].id));
+    getAnosLetivosAccessivel()
+      .then((anos) => {
+        setAnosLetivos(anos);
+        if (anos.length > 0) setAnoLetivoSelecionado(String(anos[0].id));
       })
       .finally(() => setLoadingSelects(false));
   }, []);
@@ -49,7 +51,10 @@ export default function Maternal() {
     if (!anoLetivoSelecionado) return;
 
     setLoadingTurmas(true);
-    getTurmasByAnoLetivo(anoLetivoSelecionado)
+    const fetch = user.role === ROLES.Professor
+      ? getTurmasByProfessor(user.id, anoLetivoSelecionado)
+      : getTurmasByAnoLetivo(anoLetivoSelecionado);
+    fetch
       .then(({ data }) => {
         const todas = Array.isArray(data) ? data : data.data ?? [];
         setTurmas(todas.filter((t) => t.segmento === SEGMENTOS.Maternal));

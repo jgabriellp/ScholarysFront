@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { Card, Table, Button, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
 import { Star } from 'lucide-react';
 import { getNotasByTurmaDisciplinaAno, lancaNota } from '../api/notas';
-import { getTurmasByAnoLetivo } from '../api/turmas';
+import { getTurmasByAnoLetivo, getTurmasByProfessor } from '../api/turmas';
 import { getDisciplinas } from '../api/disciplinas';
-import { getAnoLetivos } from '../api/anoLetivo';
+import { getAnosLetivosAccessivel } from '../api/anoLetivo';
 import { getAlunosByTurma } from '../api/alunos';
+import { useAuth } from '../contexts/AuthContext';
+import { ROLES } from '../utils/constants';
 
 const UNIDADES = [
   { value: 1, label: 'Unidade 1 — 1º Semestre' },
@@ -18,6 +20,8 @@ const UNIDADES = [
 ];
 
 export default function Notas() {
+  const { user } = useAuth();
+  const canSave = user.role === ROLES.Admin || user.role === ROLES.Professor;
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [disciplinas, setDisciplinas] = useState([]);
@@ -39,9 +43,8 @@ export default function Notas() {
 
   // Mount: anos letivos e disciplinas
   useEffect(() => {
-    Promise.all([getAnoLetivos(), getDisciplinas()])
-      .then(([anosRes, discRes]) => {
-        const anos = anosRes.data.data;
+    Promise.all([getAnosLetivosAccessivel(), getDisciplinas()])
+      .then(([anos, discRes]) => {
         const discs = discRes.data.data;
         setAnosLetivos(anos);
         setDisciplinas(discs);
@@ -60,7 +63,10 @@ export default function Notas() {
     if (!anoLetivoSelecionado) return;
 
     setLoadingTurmas(true);
-    getTurmasByAnoLetivo(anoLetivoSelecionado)
+    const fetch = user.role === ROLES.Professor
+      ? getTurmasByProfessor(user.id, anoLetivoSelecionado)
+      : getTurmasByAnoLetivo(anoLetivoSelecionado);
+    fetch
       .then(({ data }) => setTurmas(Array.isArray(data) ? data : data.data ?? []))
       .catch(() => setTurmas([]))
       .finally(() => setLoadingTurmas(false));
@@ -252,12 +258,14 @@ export default function Notas() {
           <Card className="border-0 shadow-sm">
             <Card.Header className="bg-white border-bottom d-flex justify-content-between align-items-center py-3 px-4">
               <small className="text-muted">
-                {alunos.length} aluno(s) — insira 0 a 10 por aluno
+                {alunos.length} aluno(s){canSave ? ' — insira 0 a 10 por aluno' : ' — somente visualização'}
               </small>
-              <Button size="sm" variant="primary" onClick={handleSave} disabled={saving}>
-                {saving && <Spinner size="sm" className="me-1" />}
-                Salvar Notas
-              </Button>
+              {canSave && (
+                <Button size="sm" variant="primary" onClick={handleSave} disabled={saving}>
+                  {saving && <Spinner size="sm" className="me-1" />}
+                  Salvar Notas
+                </Button>
+              )}
             </Card.Header>
             <Card.Body className="p-0">
               <Table hover responsive className="mb-0">
@@ -286,7 +294,8 @@ export default function Notas() {
                             size="sm"
                             style={{ width: 100 }}
                             value={val}
-                            onChange={(e) => setNota(aluno.id, e.target.value)}
+                            onChange={(e) => canSave && setNota(aluno.id, e.target.value)}
+                            readOnly={!canSave}
                             className={reprovado ? 'border-danger text-danger' : ''}
                           />
                         </td>

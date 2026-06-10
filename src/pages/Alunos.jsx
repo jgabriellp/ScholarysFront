@@ -17,10 +17,11 @@ import {
   updateAluno,
   deleteAluno,
 } from "../api/alunos";
-import { getTurmasByAnoLetivo } from "../api/turmas";
+import { getTurmasByAnoLetivo, getTurmasByProfessor } from "../api/turmas";
 import { getAllUsuarios } from "../api/usuarios";
-import { getAnoLetivos } from "../api/anoLetivo";
+import { getAnosLetivosAccessivel } from "../api/anoLetivo";
 import { ROLES } from "../utils/constants";
+import { useAuth } from "../contexts/AuthContext";
 
 const defaultForm = {
   nome: "",
@@ -32,6 +33,8 @@ const defaultForm = {
 };
 
 export default function Alunos() {
+  const { user } = useAuth();
+  const canEdit = user.role === ROLES.Admin;
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [usuariosAluno, setUsuariosAluno] = useState([]);
@@ -53,9 +56,8 @@ export default function Alunos() {
 
   // Carrega anos letivos e usuários aluno no mount
   useEffect(() => {
-    Promise.all([getAnoLetivos(), getAllUsuarios()])
-      .then(([anosRes, usuariosRes]) => {
-        const anos = anosRes.data.data;
+    Promise.all([getAnosLetivosAccessivel(), getAllUsuarios()])
+      .then(([anos, usuariosRes]) => {
         setAnosLetivos(anos);
         setUsuariosAluno(
           usuariosRes.data.data.filter((u) => u.role === ROLES.Aluno),
@@ -73,7 +75,10 @@ export default function Alunos() {
     if (!anoLetivoFiltro) return;
 
     setLoadingTurmas(true);
-    getTurmasByAnoLetivo(anoLetivoFiltro)
+    const fetch = user.role === ROLES.Professor
+      ? getTurmasByProfessor(user.id, anoLetivoFiltro)
+      : getTurmasByAnoLetivo(anoLetivoFiltro);
+    fetch
       .then(({ data }) =>
         setTurmas(Array.isArray(data) ? data : (data.data ?? [])),
       )
@@ -185,15 +190,12 @@ export default function Alunos() {
           <GraduationCap size={20} className="text-slate-600" />
           <h5 className="fw-bold text-slate-800 mb-0">Alunos</h5>
         </div>
-        <Button
-          variant="primary"
-          className="d-flex align-items-center justify-content-between"
-          onClick={openCreate}
-          disabled={!turmaSelecionada}
-        >
-          <Plus size={14} className="me-1" />
-          Novo Aluno
-        </Button>
+        {canEdit && (
+          <Button variant="primary" onClick={openCreate} disabled={!turmaSelecionada}>
+            <Plus size={14} className="me-1" />
+            Novo Aluno
+          </Button>
+        )}
       </div>
 
       {anosLetivos.length === 0 && (
@@ -275,12 +277,10 @@ export default function Alunos() {
             <Table hover responsive className="mb-0">
               <thead className="table-light">
                 <tr>
-                  <th className="ps-4" style={{ width: 60 }}>
-                    Nº
-                  </th>
+                  <th className="ps-4" style={{ width: 60 }}>Nº</th>
                   <th>Nome</th>
                   <th>Nascimento</th>
-                  <th style={{ width: 100 }}>Ações</th>
+                  {canEdit && <th style={{ width: 100 }}>Ações</th>}
                 </tr>
               </thead>
               <tbody>
@@ -289,24 +289,18 @@ export default function Alunos() {
                     <td className="ps-4 text-muted">{item.numeroChamada}</td>
                     <td className="fw-medium">{item.nome}</td>
                     <td className="small text-muted">{item.dataNascimento}</td>
-                    <td>
-                      <div className="d-flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline-secondary"
-                          onClick={() => openEdit(item)}
-                        >
-                          <Pencil size={12} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline-danger"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 size={12} />
-                        </Button>
-                      </div>
-                    </td>
+                    {canEdit && (
+                      <td>
+                        <div className="d-flex gap-1">
+                          <Button size="sm" variant="outline-secondary" onClick={() => openEdit(item)}>
+                            <Pencil size={12} />
+                          </Button>
+                          <Button size="sm" variant="outline-danger" onClick={() => handleDelete(item.id)}>
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

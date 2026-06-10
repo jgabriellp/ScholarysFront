@@ -16,18 +16,21 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { ROLES, ROLE_LABELS } from '../utils/constants';
 
+const gestao = [ROLES.Admin, ROLES.Diretor, ROLES.Coordenador];
+const academico = [ROLES.Admin, ROLES.Diretor, ROLES.Coordenador, ROLES.Professor];
+
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: null },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: academico },
   { section: 'Gestão' },
   { to: '/anoletivo', label: 'Ano Letivo', icon: Calendar, roles: [ROLES.Admin] },
-  { to: '/turmas', label: 'Turmas', icon: Users, roles: [ROLES.Admin, ROLES.Diretor, ROLES.Coordenador] },
-  { to: '/disciplinas', label: 'Disciplinas', icon: BookOpen, roles: null },
+  { to: '/turmas', label: 'Turmas', icon: Users, roles: gestao },
+  { to: '/disciplinas', label: 'Disciplinas', icon: BookOpen, roles: academico },
   { to: '/usuarios', label: 'Usuários', icon: UserCog, roles: [ROLES.Admin] },
-  { to: '/alunos', label: 'Alunos', icon: GraduationCap, roles: [ROLES.Admin, ROLES.Diretor, ROLES.Coordenador, ROLES.Professor] },
-  { to: '/vinculos', label: 'Vínculos', icon: GitMerge, roles: [ROLES.Admin, ROLES.Diretor, ROLES.Coordenador] },
+  { to: '/alunos', label: 'Alunos', icon: GraduationCap, roles: academico },
+  { to: '/vinculos', label: 'Vínculos', icon: GitMerge, roles: gestao },
   { section: 'Acadêmico' },
-  { to: '/frequencia', label: 'Frequência', icon: ClipboardList, roles: [ROLES.Admin, ROLES.Professor, ROLES.Diretor, ROLES.Coordenador] },
-  { to: '/notas', label: 'Notas', icon: Star, roles: [ROLES.Admin, ROLES.Professor, ROLES.Diretor, ROLES.Coordenador] },
+  { to: '/frequencia', label: 'Frequência', icon: ClipboardList, roles: academico },
+  { to: '/notas', label: 'Notas', icon: Star, roles: academico },
   { to: '/maternal', label: 'Desenvolvimento Maternal', icon: Baby, roles: [ROLES.Admin, ROLES.Professor] },
   { section: 'Relatórios' },
   { to: '/diario', label: 'Diário', icon: FileText, roles: null },
@@ -36,9 +39,13 @@ const navItems = [
 export default function Layout() {
   const { user, signOut } = useAuth();
 
-  const visibleItems = navItems.filter((item) => {
-    if (item.section) return true;
-    return item.roles === null || item.roles.includes(user.role);
+  const visibleItems = navItems.filter((item, i, arr) => {
+    if (!item.section) return item.roles === null || item.roles.includes(user.role);
+    // mostra a seção só se houver ao menos um link visível abaixo dela
+    const rest = arr.slice(i + 1);
+    const nextSectionIdx = rest.findIndex((x) => x.section);
+    const block = nextSectionIdx === -1 ? rest : rest.slice(0, nextSectionIdx);
+    return block.some((x) => x.roles === null || x.roles.includes(user.role));
   });
 
   return (

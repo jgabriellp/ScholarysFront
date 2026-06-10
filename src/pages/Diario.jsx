@@ -12,10 +12,11 @@ import {
 } from "react-bootstrap";
 import { FileText, Printer } from "lucide-react";
 import { getDiarioMaternal, getDiarioFundamental } from "../api/diario";
-import { getTurmasByAnoLetivo } from "../api/turmas";
-import { getAnoLetivos } from "../api/anoLetivo";
-import { getAlunosByTurma } from "../api/alunos";
-import { SEGMENTOS, SEGMENTO_LABELS } from "../utils/constants";
+import { getTurmasByAnoLetivo, getTurmasByProfessor } from "../api/turmas";
+import { getAnosLetivosAccessivel } from "../api/anoLetivo";
+import { getAlunosByTurma, getAlunoByUsuario } from "../api/alunos";
+import { useAuth } from "../contexts/AuthContext";
+import { ROLES, SEGMENTOS, SEGMENTO_LABELS } from "../utils/constants";
 
 function fmt(valor) {
   if (valor == null) return "—";
@@ -208,6 +209,8 @@ function DesenvolvimentosMaternal({ desenvolvimentos }) {
 }
 
 export default function Diario() {
+  const { user } = useAuth();
+  const isAluno = user.role === ROLES.Aluno;
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [alunos, setAlunos] = useState([]);
@@ -225,18 +228,30 @@ export default function Diario() {
   const [loadingDiario, setLoadingDiario] = useState(false);
   const [erro, setErro] = useState("");
 
-  // Mount: anos letivos
+  // Mount: Aluno resolves own record; others load anos letivos
   useEffect(() => {
-    getAnoLetivos()
-      .then(({ data }) => {
-        setAnosLetivos(data.data);
-        if (data.data.length > 0) setAnoLetivoSelecionado(String(data.data[0].id));
-      })
-      .finally(() => setLoadingSelects(false));
+    if (isAluno) {
+      getAlunoByUsuario(user.id)
+        .then(({ data }) => {
+          setAlunoSelecionado(String(data.id));
+          setAnoLetivoSelecionado(String(data.anoLetivoId));
+          setTurmaSelecionada(String(data.turmaId));
+        })
+        .catch(() => setErro("Não foi possível carregar o seu registro de aluno."))
+        .finally(() => setLoadingSelects(false));
+    } else {
+      getAnosLetivosAccessivel()
+        .then((anos) => {
+          setAnosLetivos(anos);
+          if (anos.length > 0) setAnoLetivoSelecionado(String(anos[0].id));
+        })
+        .finally(() => setLoadingSelects(false));
+    }
   }, []);
 
-  // Ano letivo → turmas
+  // Ano letivo → turmas (not needed for Aluno — resolved at mount)
   useEffect(() => {
+    if (isAluno) return;
     setTurmas([]);
     setTurmaSelecionada("");
     setAlunos([]);
@@ -246,14 +261,18 @@ export default function Diario() {
     if (!anoLetivoSelecionado) return;
 
     setLoadingTurmas(true);
-    getTurmasByAnoLetivo(anoLetivoSelecionado)
+    const fetch = user.role === ROLES.Professor
+      ? getTurmasByProfessor(user.id, anoLetivoSelecionado)
+      : getTurmasByAnoLetivo(anoLetivoSelecionado);
+    fetch
       .then(({ data }) => setTurmas(Array.isArray(data) ? data : data.data ?? []))
       .catch(() => setTurmas([]))
       .finally(() => setLoadingTurmas(false));
   }, [anoLetivoSelecionado]);
 
-  // Turma → alunos
+  // Turma → alunos (not needed for Aluno — resolved at mount)
   useEffect(() => {
+    if (isAluno) return;
     setAlunos([]);
     setAlunoSelecionado("");
     setDiario(null);
@@ -272,13 +291,30 @@ export default function Diario() {
 
   // Aluno → diário
   useEffect(() => {
+    // Para Aluno: após segmento ser definido pelo primeiro fetch, o effect re-dispara
+    // mas não deve re-buscar — o diário já está carregado.
+    if (isAluno && segmento !== null) return;
     setDiario(null);
     setErro("");
-    if (!alunoSelecionado || !anoLetivoSelecionado || segmento == null) return;
-
-    const loadFn = segmento === SEGMENTOS.Maternal ? getDiarioMaternal : getDiarioFundamental;
+    if (!alunoSelecionado || !anoLetivoSelecionado) return;
 
     setLoadingDiario(true);
+
+    if (isAluno) {
+      // segmento desconhecido — tenta Maternal, cai em Fundamental
+      getDiarioMaternal(alunoSelecionado, anoLetivoSelecionado)
+        .then(({ data }) => { setSegmento(SEGMENTOS.Maternal); setDiario(data); setLoadingDiario(false); })
+        .catch(() =>
+          getDiarioFundamental(alunoSelecionado, anoLetivoSelecionado)
+            .then(({ data }) => { setSegmento(SEGMENTOS.Fundamental); setDiario(data); })
+            .catch(() => setErro("Não foi possível carregar o diário."))
+            .finally(() => setLoadingDiario(false))
+        );
+      return;
+    }
+
+    if (segmento == null) { setLoadingDiario(false); return; }
+    const loadFn = segmento === SEGMENTOS.Maternal ? getDiarioMaternal : getDiarioFundamental;
     loadFn(alunoSelecionado, anoLetivoSelecionado)
       .then(({ data }) => setDiario(data))
       .catch(() => setErro("Não foi possível carregar o diário."))
@@ -308,7 +344,7 @@ export default function Diario() {
         )}
       </div>
 
-      <Card className="border-0 shadow-sm mb-3">
+      {!isAluno && <Card className="border-0 shadow-sm mb-3">
         <Card.Body className="py-3 px-4">
           <Row className="g-3 align-items-end">
             <Col xs={12} md={3}>
@@ -375,9 +411,11 @@ export default function Diario() {
             </Col>
           </Row>
         </Card.Body>
-      </Card>
+      </Card>}
 
-      {!alunoSelecionado ? (
+      {erro ? (
+        <Alert variant="danger" className="py-2 small">{erro}</Alert>
+      ) : !alunoSelecionado ? (
         <Card className="border-0 shadow-sm">
           <Card.Body className="text-center p-5 text-muted small">
             Selecione ano letivo, turma e aluno para visualizar o diário.
@@ -385,8 +423,6 @@ export default function Diario() {
         </Card>
       ) : loadingDiario ? (
         <div className="text-center p-5"><Spinner variant="primary" /></div>
-      ) : erro ? (
-        <Alert variant="danger" className="py-2 small">{erro}</Alert>
       ) : diario ? (
         <div id="diario-content">
           <Card className="border-0 shadow-sm mb-3">

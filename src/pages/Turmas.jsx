@@ -18,8 +18,9 @@ import {
   updateTurma,
   deleteTurma,
 } from "../api/turmas";
-import { getAnoLetivos } from "../api/anoLetivo";
-import { SEGMENTO_LABELS } from "../utils/constants";
+import { getAnosLetivosAccessivel } from "../api/anoLetivo";
+import { SEGMENTO_LABELS, ROLES } from "../utils/constants";
+import { useAuth } from "../contexts/AuthContext";
 
 const SEGMENTO_OPTIONS = [
   { value: 0, label: "Maternal" },
@@ -31,6 +32,8 @@ const SEGMENTO_COLORS = { 0: "warning", 1: "primary" };
 const defaultForm = { nome: "", segmento: 0, anoLetivoId: "" };
 
 export default function Turmas() {
+  const { user } = useAuth();
+  const canEdit = user.role === ROLES.Admin;
   const [items, setItems] = useState([]);
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [anoLetivoFiltro, setAnoLetivoFiltro] = useState("");
@@ -43,10 +46,10 @@ export default function Turmas() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getAnoLetivos()
-      .then(({ data }) => {
-        setAnosLetivos(data.data);
-        if (data.data.length > 0) setAnoLetivoFiltro(String(data.data[0].id));
+    getAnosLetivosAccessivel()
+      .then((anos) => {
+        setAnosLetivos(anos);
+        if (anos.length > 0) setAnoLetivoFiltro(String(anos[0].id));
       })
       .finally(() => setLoadingSelects(false));
   }, []);
@@ -139,15 +142,16 @@ export default function Turmas() {
           <Users size={20} className="text-slate-600" />
           <h5 className="fw-bold text-slate-800 mb-0">Turmas</h5>
         </div>
-        <Button
-          variant="primary"
-          className="d-flex align-items-center justify-content-between"
-          onClick={openCreate}
-          disabled={anosLetivos.length === 0}
-        >
-          <Plus size={14} className="me-1" />
-          Nova Turma
-        </Button>
+        {canEdit && (
+          <Button
+            variant="primary"
+            onClick={openCreate}
+            disabled={anosLetivos.length === 0}
+          >
+            <Plus size={14} className="me-1" />
+            Nova Turma
+          </Button>
+        )}
       </div>
 
       {anosLetivos.length === 0 && (
@@ -196,7 +200,7 @@ export default function Turmas() {
                 <tr>
                   <th className="ps-4">Nome</th>
                   <th>Segmento</th>
-                  <th style={{ width: 100 }}>Ações</th>
+                  {canEdit && <th style={{ width: 100 }}>Ações</th>}
                 </tr>
               </thead>
               <tbody>
@@ -208,24 +212,18 @@ export default function Turmas() {
                         {SEGMENTO_LABELS[item.segmento]}
                       </Badge>
                     </td>
-                    <td>
-                      <div className="d-flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline-secondary"
-                          onClick={() => openEdit(item)}
-                        >
-                          <Pencil size={12} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline-danger"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 size={12} />
-                        </Button>
-                      </div>
-                    </td>
+                    {canEdit && (
+                      <td>
+                        <div className="d-flex gap-1">
+                          <Button size="sm" variant="outline-secondary" onClick={() => openEdit(item)}>
+                            <Pencil size={12} />
+                          </Button>
+                          <Button size="sm" variant="outline-danger" onClick={() => handleDelete(item.id)}>
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

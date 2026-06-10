@@ -5,7 +5,9 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('user');
-    return stored ? JSON.parse(stored) : null;
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    return { ...parsed, role: Number(parsed.role) };
   });
 
   function signIn(data) {
@@ -13,7 +15,7 @@ export function AuthProvider({ children }) {
       token: data.token,
       nome: data.userName,
       email: data.userEmail,
-      role: data.userRole,
+      role: Number(data.userRole),
       id: data.userId,
     };
     localStorage.setItem('token', data.token);

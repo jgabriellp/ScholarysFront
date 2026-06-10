@@ -2,11 +2,15 @@ import { useState, useEffect } from 'react';
 import { Card, Table, Button, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
 import { ClipboardList } from 'lucide-react';
 import { getFrequenciaByTurmaData, lancaFrequencia } from '../api/frequencia';
-import { getTurmasByAnoLetivo } from '../api/turmas';
-import { getAnoLetivos } from '../api/anoLetivo';
+import { getTurmasByAnoLetivo, getTurmasByProfessor } from '../api/turmas';
+import { getAnosLetivosAccessivel } from '../api/anoLetivo';
 import { getAlunosByTurma } from '../api/alunos';
+import { useAuth } from '../contexts/AuthContext';
+import { ROLES } from '../utils/constants';
 
 export default function Frequencia() {
+  const { user } = useAuth();
+  const canSave = user.role === ROLES.Admin || user.role === ROLES.Professor;
   const today = new Date().toISOString().split('T')[0];
 
   const [anosLetivos, setAnosLetivos] = useState([]);
@@ -27,10 +31,10 @@ export default function Frequencia() {
 
   // Mount: carrega anos letivos e seleciona o primeiro
   useEffect(() => {
-    getAnoLetivos()
-      .then(({ data: res }) => {
-        setAnosLetivos(res.data);
-        if (res.data.length > 0) setAnoLetivoSelecionado(String(res.data[0].id));
+    getAnosLetivosAccessivel()
+      .then((anos) => {
+        setAnosLetivos(anos);
+        if (anos.length > 0) setAnoLetivoSelecionado(String(anos[0].id));
       })
       .finally(() => setLoadingSelects(false));
   }, []);
@@ -44,7 +48,10 @@ export default function Frequencia() {
     if (!anoLetivoSelecionado) return;
 
     setLoadingTurmas(true);
-    getTurmasByAnoLetivo(anoLetivoSelecionado)
+    const fetch = user.role === ROLES.Professor
+      ? getTurmasByProfessor(user.id, anoLetivoSelecionado)
+      : getTurmasByAnoLetivo(anoLetivoSelecionado);
+    fetch
       .then(({ data }) => setTurmas(Array.isArray(data) ? data : data.data ?? []))
       .catch(() => setTurmas([]))
       .finally(() => setLoadingTurmas(false));
@@ -222,23 +229,20 @@ export default function Frequencia() {
                     Faltas: <strong>{totalFaltas}</strong>
                   </span>
                 </div>
-                <div className="d-flex gap-2">
-                  <Button size="sm" variant="outline-secondary" onClick={() => marcarTodos(true)}>
-                    Todos presentes
-                  </Button>
-                  <Button size="sm" variant="outline-secondary" onClick={() => marcarTodos(false)}>
-                    Todos faltaram
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={handleSave}
-                    disabled={saving}
-                  >
-                    {saving && <Spinner size="sm" className="me-1" />}
-                    Salvar
-                  </Button>
-                </div>
+                {canSave && (
+                  <div className="d-flex gap-2">
+                    <Button size="sm" variant="outline-secondary" onClick={() => marcarTodos(true)}>
+                      Todos presentes
+                    </Button>
+                    <Button size="sm" variant="outline-secondary" onClick={() => marcarTodos(false)}>
+                      Todos faltaram
+                    </Button>
+                    <Button size="sm" variant="primary" onClick={handleSave} disabled={saving}>
+                      {saving && <Spinner size="sm" className="me-1" />}
+                      Salvar
+                    </Button>
+                  </div>
+                )}
               </div>
             </Card.Header>
             <Card.Body className="p-0">
@@ -262,7 +266,8 @@ export default function Frequencia() {
                             type="switch"
                             id={`switch-${aluno.id}`}
                             checked={presente}
-                            onChange={() => togglePresenca(aluno.id)}
+                            onChange={() => canSave && togglePresenca(aluno.id)}
+                            disabled={!canSave}
                             label={
                               presente
                                 ? <span className="text-success small fw-medium">Presente</span>

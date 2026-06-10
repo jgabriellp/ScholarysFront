@@ -39,7 +39,7 @@ export default function App() {
             <Route index element={<Dashboard />} />
             <Route path="anoletivo" element={<PrivateRoute allowedRoles={adminOnly}><AnoLetivo /></PrivateRoute>} />
             <Route path="turmas" element={<PrivateRoute allowedRoles={gestao}><Turmas /></PrivateRoute>} />
-            <Route path="disciplinas" element={<Disciplinas />} />
+            <Route path="disciplinas" element={<PrivateRoute allowedRoles={[...gestao, ROLES.Professor]}><Disciplinas /></PrivateRoute>} />
             <Route path="usuarios" element={<PrivateRoute allowedRoles={adminOnly}><Usuarios /></PrivateRoute>} />
             <Route path="alunos" element={<PrivateRoute allowedRoles={[...gestao, ROLES.Professor]}><Alunos /></PrivateRoute>} />
             <Route path="vinculos" element={<PrivateRoute allowedRoles={gestao}><Vinculos /></PrivateRoute>} />

@@ -19,8 +19,9 @@ import {
 import { getTurmasByAnoLetivo } from "../api/turmas";
 import { getDisciplinas } from "../api/disciplinas";
 import { getAllUsuarios } from "../api/usuarios";
-import { getAnoLetivos } from "../api/anoLetivo";
+import { getAnosLetivosAccessivel } from "../api/anoLetivo";
 import { ROLES } from "../utils/constants";
+import { useAuth } from "../contexts/AuthContext";
 
 const defaultForm = {
   turmaId: "",
@@ -30,6 +31,8 @@ const defaultForm = {
 };
 
 export default function Vinculos() {
+  const { user } = useAuth();
+  const canEdit = user.role === ROLES.Admin;
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [disciplinas, setDisciplinas] = useState([]);
@@ -51,9 +54,8 @@ export default function Vinculos() {
 
   // Mount: anos letivos, disciplinas e professores (independentes de filtro)
   useEffect(() => {
-    Promise.all([getAnoLetivos(), getDisciplinas(), getAllUsuarios()])
-      .then(([anosRes, discRes, usuariosRes]) => {
-        const anos = anosRes.data.data;
+    Promise.all([getAnosLetivosAccessivel(), getDisciplinas(), getAllUsuarios()])
+      .then(([anos, discRes, usuariosRes]) => {
         setAnosLetivos(anos);
         setDisciplinas(discRes.data.data);
         setProfessores(
@@ -170,19 +172,16 @@ export default function Vinculos() {
             Vínculos (Turma / Disciplina / Professor)
           </h5>
         </div>
-        <Button
-          variant="primary"
-          className="d-flex align-items-center justify-content-between"
-          onClick={openCreate}
-          disabled={
-            !turmaSelecionada ||
-            disciplinas.length === 0 ||
-            professores.length === 0
-          }
-        >
-          <Plus size={14} className="me-1" />
-          Novo Vínculo
-        </Button>
+        {canEdit && (
+          <Button
+            variant="primary"
+            onClick={openCreate}
+            disabled={!turmaSelecionada || disciplinas.length === 0 || professores.length === 0}
+          >
+            <Plus size={14} className="me-1" />
+            Novo Vínculo
+          </Button>
+        )}
       </div>
 
       {professores.length === 0 && (
@@ -259,7 +258,7 @@ export default function Vinculos() {
                 <tr>
                   <th className="ps-4">Disciplina</th>
                   <th>Professor</th>
-                  <th style={{ width: 80 }}>Ações</th>
+                  {canEdit && <th style={{ width: 80 }}>Ações</th>}
                 </tr>
               </thead>
               <tbody>
@@ -267,15 +266,13 @@ export default function Vinculos() {
                   <tr key={item.id}>
                     <td className="ps-4 fw-medium">{item.disciplinaNome}</td>
                     <td>{item.professorNome}</td>
-                    <td>
-                      <Button
-                        size="sm"
-                        variant="outline-danger"
-                        onClick={() => handleDelete(item.id)}
-                      >
-                        <Trash2 size={12} />
-                      </Button>
-                    </td>
+                    {canEdit && (
+                      <td>
+                        <Button size="sm" variant="outline-danger" onClick={() => handleDelete(item.id)}>
+                          <Trash2 size={12} />
+                        </Button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

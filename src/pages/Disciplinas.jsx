@@ -16,10 +16,14 @@ import {
   updateDisciplina,
   deleteDisciplina,
 } from "../api/disciplinas";
+import { useAuth } from "../contexts/AuthContext";
+import { ROLES } from "../utils/constants";
 
 const defaultForm = { nome: "" };
 
 export default function Disciplinas() {
+  const { user } = useAuth();
+  const canEdit = user.role === ROLES.Admin;
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -92,9 +96,12 @@ export default function Disciplinas() {
           <BookOpen size={20} className="text-slate-600" />
           <h5 className="fw-bold text-slate-800 mb-0">Disciplinas</h5>
         </div>
-        <Button size="md" variant="primary" onClick={openCreate}>
-          Nova Disciplina
-        </Button>
+        {canEdit && (
+          <Button variant="primary" onClick={openCreate}>
+            <Plus size={14} className="me-1" />
+            Nova Disciplina
+          </Button>
+        )}
       </div>
 
       <Card className="border-0 shadow-sm">
@@ -113,7 +120,7 @@ export default function Disciplinas() {
                 <tr>
                   <th className="ps-4">Nome</th>
                   <th>Status</th>
-                  <th style={{ width: 100 }}>Ações</th>
+                  {canEdit && <th style={{ width: 100 }}>Ações</th>}
                 </tr>
               </thead>
               <tbody>
@@ -125,24 +132,26 @@ export default function Disciplinas() {
                         {item.ativo ? "Ativa" : "Inativa"}
                       </Badge>
                     </td>
-                    <td>
-                      <div className="d-flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline-secondary"
-                          onClick={() => openEdit(item)}
-                        >
-                          <Pencil size={12} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline-danger"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 size={12} />
-                        </Button>
-                      </div>
-                    </td>
+                    {canEdit && (
+                      <td>
+                        <div className="d-flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline-secondary"
+                            onClick={() => openEdit(item)}
+                          >
+                            <Pencil size={12} />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline-danger"
+                            onClick={() => handleDelete(item.id)}
+                          >
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
