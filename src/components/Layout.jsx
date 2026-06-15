@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard,
   Calendar,
+  CalendarDays,
   Users,
   BookOpen,
   UserCog,
@@ -10,6 +11,7 @@ import {
   ClipboardList,
   Star,
   Baby,
+  NotebookPen,
   FileText,
   LogOut,
 } from 'lucide-react';
@@ -23,6 +25,7 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: academico },
   { section: 'Gestão' },
   { to: '/anoletivo', label: 'Ano Letivo', icon: Calendar, roles: [ROLES.Admin] },
+  { to: '/dias-letivos', label: 'Dias Letivos', icon: CalendarDays, roles: gestao },
   { to: '/turmas', label: 'Turmas', icon: Users, roles: gestao },
   { to: '/disciplinas', label: 'Disciplinas', icon: BookOpen, roles: academico },
   { to: '/usuarios', label: 'Usuários', icon: UserCog, roles: [ROLES.Admin] },
@@ -32,6 +35,7 @@ const navItems = [
   { to: '/frequencia', label: 'Frequência', icon: ClipboardList, roles: academico },
   { to: '/notas', label: 'Notas', icon: Star, roles: academico },
   { to: '/maternal', label: 'Desenvolvimento Maternal', icon: Baby, roles: [ROLES.Admin, ROLES.Professor] },
+  { to: '/relato-aula', label: 'Relato de Aula', icon: NotebookPen, roles: academico },
   { section: 'Relatórios' },
   { to: '/diario', label: 'Diário', icon: FileText, roles: null },
 ];

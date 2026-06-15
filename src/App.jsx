@@ -16,6 +16,8 @@ import Frequencia from './pages/Frequencia';
 import Notas from './pages/Notas';
 import Maternal from './pages/Maternal';
 import Diario from './pages/Diario';
+import DiasLetivos from './pages/DiasLetivos';
+import RelatoAula from './pages/RelatoAula';
 
 const adminOnly = [ROLES.Admin];
 const gestao = [ROLES.Admin, ROLES.Diretor, ROLES.Coordenador];
@@ -46,6 +48,8 @@ export default function App() {
             <Route path="frequencia" element={<PrivateRoute allowedRoles={academico}><Frequencia /></PrivateRoute>} />
             <Route path="notas" element={<PrivateRoute allowedRoles={academico}><Notas /></PrivateRoute>} />
             <Route path="maternal" element={<PrivateRoute allowedRoles={[ROLES.Admin, ROLES.Professor]}><Maternal /></PrivateRoute>} />
+            <Route path="dias-letivos" element={<PrivateRoute allowedRoles={gestao}><DiasLetivos /></PrivateRoute>} />
+            <Route path="relato-aula" element={<PrivateRoute allowedRoles={academico}><RelatoAula /></PrivateRoute>} />
             <Route path="diario" element={<Diario />} />
           </Route>
         </Routes>
