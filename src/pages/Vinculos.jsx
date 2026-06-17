@@ -54,7 +54,11 @@ export default function Vinculos() {
 
   // Mount: anos letivos, disciplinas e professores (independentes de filtro)
   useEffect(() => {
-    Promise.all([getAnosLetivosAccessivel(), getDisciplinas(), getAllUsuarios()])
+    Promise.all([
+      getAnosLetivosAccessivel(),
+      getDisciplinas(),
+      getAllUsuarios(),
+    ])
       .then(([anos, discRes, usuariosRes]) => {
         setAnosLetivos(anos);
         setDisciplinas(discRes.data.data);
@@ -175,8 +179,13 @@ export default function Vinculos() {
         {canEdit && (
           <Button
             variant="primary"
+            className="d-flex align-items-center justify-content-between mb-4"
             onClick={openCreate}
-            disabled={!turmaSelecionada || disciplinas.length === 0 || professores.length === 0}
+            disabled={
+              !turmaSelecionada ||
+              disciplinas.length === 0 ||
+              professores.length === 0
+            }
           >
             <Plus size={14} className="me-1" />
             Novo Vínculo
@@ -268,7 +277,11 @@ export default function Vinculos() {
                     <td>{item.professorNome}</td>
                     {canEdit && (
                       <td>
-                        <Button size="sm" variant="outline-danger" onClick={() => handleDelete(item.id)}>
+                        <Button
+                          size="sm"
+                          variant="outline-danger"
+                          onClick={() => handleDelete(item.id)}
+                        >
                           <Trash2 size={12} />
                         </Button>
                       </td>

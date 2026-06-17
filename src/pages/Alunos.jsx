@@ -75,9 +75,10 @@ export default function Alunos() {
     if (!anoLetivoFiltro) return;
 
     setLoadingTurmas(true);
-    const fetch = user.role === ROLES.Professor
-      ? getTurmasByProfessor(user.id, anoLetivoFiltro)
-      : getTurmasByAnoLetivo(anoLetivoFiltro);
+    const fetch =
+      user.role === ROLES.Professor
+        ? getTurmasByProfessor(user.id, anoLetivoFiltro)
+        : getTurmasByAnoLetivo(anoLetivoFiltro);
     fetch
       .then(({ data }) =>
         setTurmas(Array.isArray(data) ? data : (data.data ?? [])),
@@ -191,7 +192,12 @@ export default function Alunos() {
           <h5 className="fw-bold text-slate-800 mb-0">Alunos</h5>
         </div>
         {canEdit && (
-          <Button variant="primary" onClick={openCreate} disabled={!turmaSelecionada}>
+          <Button
+            variant="primary"
+            className="d-flex align-items-center justify-content-between mb-4"
+            onClick={openCreate}
+            disabled={!turmaSelecionada}
+          >
             <Plus size={14} className="me-1" />
             Novo Aluno
           </Button>
@@ -277,7 +283,9 @@ export default function Alunos() {
             <Table hover responsive className="mb-0">
               <thead className="table-light">
                 <tr>
-                  <th className="ps-4" style={{ width: 60 }}>Nº</th>
+                  <th className="ps-4" style={{ width: 60 }}>
+                    Nº
+                  </th>
                   <th>Nome</th>
                   <th>Nascimento</th>
                   {canEdit && <th style={{ width: 100 }}>Ações</th>}
@@ -292,10 +300,18 @@ export default function Alunos() {
                     {canEdit && (
                       <td>
                         <div className="d-flex gap-1">
-                          <Button size="sm" variant="outline-secondary" onClick={() => openEdit(item)}>
+                          <Button
+                            size="sm"
+                            variant="outline-secondary"
+                            onClick={() => openEdit(item)}
+                          >
                             <Pencil size={12} />
                           </Button>
-                          <Button size="sm" variant="outline-danger" onClick={() => handleDelete(item.id)}>
+                          <Button
+                            size="sm"
+                            variant="outline-danger"
+                            onClick={() => handleDelete(item.id)}
+                          >
                             <Trash2 size={12} />
                           </Button>
                         </div>

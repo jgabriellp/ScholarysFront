@@ -145,6 +145,7 @@ export default function Turmas() {
         {canEdit && (
           <Button
             variant="primary"
+            className="d-flex align-items-center justify-content-between mb-4"
             onClick={openCreate}
             disabled={anosLetivos.length === 0}
           >
@@ -215,10 +216,18 @@ export default function Turmas() {
                     {canEdit && (
                       <td>
                         <div className="d-flex gap-1">
-                          <Button size="sm" variant="outline-secondary" onClick={() => openEdit(item)}>
+                          <Button
+                            size="sm"
+                            variant="outline-secondary"
+                            onClick={() => openEdit(item)}
+                          >
                             <Pencil size={12} />
                           </Button>
-                          <Button size="sm" variant="outline-danger" onClick={() => handleDelete(item.id)}>
+                          <Button
+                            size="sm"
+                            variant="outline-danger"
+                            onClick={() => handleDelete(item.id)}
+                          >
                             <Trash2 size={12} />
                           </Button>
                         </div>

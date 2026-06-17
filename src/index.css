@@ -20,6 +20,14 @@ body {
   @apply bg-blue-600 text-white;
 }
 
+.sidebar-link-icon {
+  @apply flex items-center justify-center py-2.5 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer w-full;
+}
+
+.sidebar-link-icon.active {
+  @apply bg-blue-600 text-white;
+}
+
 .sidebar-section {
   @apply px-4 py-1 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-1;
 }

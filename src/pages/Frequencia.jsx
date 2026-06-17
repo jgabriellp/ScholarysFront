@@ -1,33 +1,43 @@
-import { useState, useEffect } from 'react';
-import { Card, Table, Button, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
-import { ClipboardList } from 'lucide-react';
-import { getFrequenciaByTurmaData, lancaFrequencia } from '../api/frequencia';
-import { getTurmasByAnoLetivo, getTurmasByProfessor } from '../api/turmas';
-import { getAnosLetivosAccessivel } from '../api/anoLetivo';
-import { getAlunosByTurma } from '../api/alunos';
-import { useAuth } from '../contexts/AuthContext';
-import { ROLES } from '../utils/constants';
+import { useState, useEffect } from "react";
+import {
+  Card,
+  Table,
+  Button,
+  Form,
+  Row,
+  Col,
+  Spinner,
+  Alert,
+} from "react-bootstrap";
+import { ClipboardList } from "lucide-react";
+import { getFrequenciaByTurmaData, lancaFrequencia } from "../api/frequencia";
+import { getTurmasByAnoLetivo, getTurmasByProfessor } from "../api/turmas";
+import { getAnosLetivosAccessivel } from "../api/anoLetivo";
+import { getAlunosByTurma } from "../api/alunos";
+import { useAuth } from "../contexts/AuthContext";
+import { ROLES } from "../utils/constants";
 
 export default function Frequencia() {
   const { user } = useAuth();
   const canSave = user.role === ROLES.Admin || user.role === ROLES.Professor;
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
 
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [alunos, setAlunos] = useState([]);
   const [presencas, setPresencas] = useState({});
+  const [observacoes, setObservacoes] = useState({});
 
-  const [anoLetivoSelecionado, setAnoLetivoSelecionado] = useState('');
-  const [turmaSelecionada, setTurmaSelecionada] = useState('');
+  const [anoLetivoSelecionado, setAnoLetivoSelecionado] = useState("");
+  const [turmaSelecionada, setTurmaSelecionada] = useState("");
   const [data, setData] = useState(today);
 
   const [loadingSelects, setLoadingSelects] = useState(true);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
   const [loadingAlunos, setLoadingAlunos] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
 
   // Mount: carrega anos letivos e seleciona o primeiro
   useEffect(() => {
@@ -42,17 +52,21 @@ export default function Frequencia() {
   // Ano letivo → turmas
   useEffect(() => {
     setTurmas([]);
-    setTurmaSelecionada('');
+    setTurmaSelecionada("");
     setAlunos([]);
     setPresencas({});
+    setObservacoes({});
     if (!anoLetivoSelecionado) return;
 
     setLoadingTurmas(true);
-    const fetch = user.role === ROLES.Professor
-      ? getTurmasByProfessor(user.id, anoLetivoSelecionado)
-      : getTurmasByAnoLetivo(anoLetivoSelecionado);
+    const fetch =
+      user.role === ROLES.Professor
+        ? getTurmasByProfessor(user.id, anoLetivoSelecionado)
+        : getTurmasByAnoLetivo(anoLetivoSelecionado);
     fetch
-      .then(({ data }) => setTurmas(Array.isArray(data) ? data : data.data ?? []))
+      .then(({ data }) =>
+        setTurmas(Array.isArray(data) ? data : (data.data ?? [])),
+      )
       .catch(() => setTurmas([]))
       .finally(() => setLoadingTurmas(false));
   }, [anoLetivoSelecionado]);
@@ -62,12 +76,13 @@ export default function Frequencia() {
     if (!turmaSelecionada) {
       setAlunos([]);
       setPresencas({});
+      setObservacoes({});
       return;
     }
 
     let cancelled = false;
     setLoadingAlunos(true);
-    setSuccess('');
+    setSuccess("");
 
     async function load() {
       try {
@@ -75,22 +90,36 @@ export default function Frequencia() {
         if (cancelled) return;
 
         setAlunos(alunosData);
-        const defaults = Object.fromEntries(alunosData.map((a) => [a.id, true]));
+        const defaults = Object.fromEntries(
+          alunosData.map((a) => [a.id, true]),
+        );
 
+        const obsDefaults = {};
         try {
-          const { data: freq } = await getFrequenciaByTurmaData(turmaSelecionada, data);
+          const { data: freq } = await getFrequenciaByTurmaData(
+            turmaSelecionada,
+            data,
+          );
           if (cancelled) return;
-          freq.alunos.forEach((a) => { defaults[a.alunoId] = a.presente; });
-        } catch { /* sem registro para esta data — mantém todos presentes */ }
+          freq.alunos.forEach((a) => {
+            defaults[a.alunoId] = a.presente;
+            if (a.observacao) obsDefaults[a.alunoId] = a.observacao;
+          });
+        } catch {
+          /* sem registro para esta data — mantém todos presentes */
+        }
 
         setPresencas(defaults);
+        setObservacoes(obsDefaults);
       } finally {
         if (!cancelled) setLoadingAlunos(false);
       }
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [turmaSelecionada, data]);
 
   function togglePresenca(alunoId) {
@@ -102,20 +131,30 @@ export default function Frequencia() {
   }
 
   async function handleSave() {
-    if (!turmaSelecionada || !anoLetivoSelecionado || !data || alunos.length === 0) return;
+    if (
+      !turmaSelecionada ||
+      !anoLetivoSelecionado ||
+      !data ||
+      alunos.length === 0
+    )
+      return;
     setSaving(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
     try {
       await lancaFrequencia({
         turmaId: Number(turmaSelecionada),
         anoLetivoId: Number(anoLetivoSelecionado),
         data,
-        alunos: alunos.map((a) => ({ alunoId: a.id, presente: presencas[a.id] ?? true })),
+        alunos: alunos.map((a) => ({
+          alunoId: a.id,
+          presente: presencas[a.id] ?? true,
+          ...(observacoes[a.id] ? { observacao: observacoes[a.id] } : {}),
+        })),
       });
-      setSuccess('Frequência registrada com sucesso!');
+      setSuccess("Frequência registrada com sucesso!");
     } catch (err) {
-      setError(err.response?.data?.message || 'Erro ao registrar frequência.');
+      setError(err.response?.data?.message || "Erro ao registrar frequência.");
     } finally {
       setSaving(false);
     }
@@ -125,7 +164,11 @@ export default function Frequencia() {
   const totalFaltas = alunos.length - totalPresentes;
 
   if (loadingSelects) {
-    return <div className="text-center p-5"><Spinner variant="primary" /></div>;
+    return (
+      <div className="text-center p-5">
+        <Spinner variant="primary" />
+      </div>
+    );
   }
 
   return (
@@ -147,7 +190,9 @@ export default function Frequencia() {
                 >
                   <option value="">Selecione</option>
                   {anosLetivos.map((a) => (
-                    <option key={a.id} value={a.id}>{a.ano}</option>
+                    <option key={a.id} value={a.id}>
+                      {a.ano}
+                    </option>
                   ))}
                 </Form.Select>
               </Form.Group>
@@ -168,7 +213,9 @@ export default function Frequencia() {
                   >
                     <option value="">Selecione a turma</option>
                     {turmas.map((t) => (
-                      <option key={t.id} value={t.id}>{t.nome}</option>
+                      <option key={t.id} value={t.id}>
+                        {t.nome}
+                      </option>
                     ))}
                   </Form.Select>
                 )}
@@ -195,7 +242,9 @@ export default function Frequencia() {
           </Card.Body>
         </Card>
       ) : loadingAlunos ? (
-        <div className="text-center p-5"><Spinner variant="primary" /></div>
+        <div className="text-center p-5">
+          <Spinner variant="primary" />
+        </div>
       ) : alunos.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <Card.Body className="text-center p-5 text-muted small">
@@ -205,12 +254,22 @@ export default function Frequencia() {
       ) : (
         <>
           {success && (
-            <Alert variant="success" className="py-2 small mb-3" dismissible onClose={() => setSuccess('')}>
+            <Alert
+              variant="success"
+              className="py-2 small mb-3"
+              dismissible
+              onClose={() => setSuccess("")}
+            >
               {success}
             </Alert>
           )}
           {error && (
-            <Alert variant="danger" className="py-2 small mb-3" dismissible onClose={() => setError('')}>
+            <Alert
+              variant="danger"
+              className="py-2 small mb-3"
+              dismissible
+              onClose={() => setError("")}
+            >
               {error}
             </Alert>
           )}
@@ -220,7 +279,8 @@ export default function Frequencia() {
               <div className="d-flex justify-content-between align-items-center">
                 <div className="d-flex gap-3 small">
                   <span className="text-muted">
-                    Total: <strong className="text-dark">{alunos.length}</strong>
+                    Total:{" "}
+                    <strong className="text-dark">{alunos.length}</strong>
                   </span>
                   <span className="text-success">
                     Presentes: <strong>{totalPresentes}</strong>
@@ -231,13 +291,26 @@ export default function Frequencia() {
                 </div>
                 {canSave && (
                   <div className="d-flex gap-2">
-                    <Button size="sm" variant="outline-secondary" onClick={() => marcarTodos(true)}>
+                    <Button
+                      size="sm"
+                      variant="outline-secondary"
+                      onClick={() => marcarTodos(true)}
+                    >
                       Todos presentes
                     </Button>
-                    <Button size="sm" variant="outline-secondary" onClick={() => marcarTodos(false)}>
+                    <Button
+                      size="sm"
+                      variant="outline-secondary"
+                      onClick={() => marcarTodos(false)}
+                    >
                       Todos faltaram
                     </Button>
-                    <Button size="sm" variant="primary" onClick={handleSave} disabled={saving}>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={handleSave}
+                      disabled={saving}
+                    >
                       {saving && <Spinner size="sm" className="me-1" />}
                       Salvar
                     </Button>
@@ -249,17 +322,26 @@ export default function Frequencia() {
               <Table hover responsive className="mb-0">
                 <thead className="table-light">
                   <tr>
-                    <th className="ps-4" style={{ width: 60 }}>Nº</th>
+                    <th className="ps-4" style={{ width: 60 }}>
+                      Nº
+                    </th>
                     <th>Nome</th>
-                    <th style={{ width: 180 }}>Presença</th>
+                    <th style={{ width: 160 }}>Presença</th>
+                    <th>Justificativa de falta</th>
                   </tr>
                 </thead>
                 <tbody>
                   {alunos.map((aluno) => {
                     const presente = presencas[aluno.id] ?? true;
+                    const obs = observacoes[aluno.id] ?? "";
                     return (
-                      <tr key={aluno.id} className={!presente ? 'table-danger' : ''}>
-                        <td className="ps-4 text-muted">{aluno.numeroChamada}</td>
+                      <tr
+                        key={aluno.id}
+                        className={!presente ? "table-danger" : ""}
+                      >
+                        <td className="ps-4 text-muted">
+                          {aluno.numeroChamada}
+                        </td>
                         <td className="fw-medium">{aluno.nome}</td>
                         <td>
                           <Form.Check
@@ -269,11 +351,40 @@ export default function Frequencia() {
                             onChange={() => canSave && togglePresenca(aluno.id)}
                             disabled={!canSave}
                             label={
-                              presente
-                                ? <span className="text-success small fw-medium">Presente</span>
-                                : <span className="text-danger small fw-medium">Falta</span>
+                              presente ? (
+                                <span className="text-success small fw-medium">
+                                  Presente
+                                </span>
+                              ) : (
+                                <span className="text-danger small fw-medium">
+                                  Falta
+                                </span>
+                              )
                             }
                           />
+                        </td>
+                        <td>
+                          {!presente ? (
+                            <Form.Control
+                              size="sm"
+                              type="text"
+                              placeholder="Ex: Atestado médico"
+                              value={obs}
+                              onChange={(e) =>
+                                canSave &&
+                                setObservacoes((prev) => ({
+                                  ...prev,
+                                  [aluno.id]: e.target.value,
+                                }))
+                              }
+                              readOnly={!canSave}
+                              style={{ maxWidth: 340 }}
+                            />
+                          ) : obs ? (
+                            <small className="text-muted fst-italic">
+                              {obs}
+                            </small>
+                          ) : null}
                         </td>
                       </tr>
                     );

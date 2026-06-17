@@ -4,6 +4,7 @@ import { Star } from 'lucide-react';
 import { getNotasByTurmaDisciplinaAno, lancaNota } from '../api/notas';
 import { getTurmasByAnoLetivo, getTurmasByProfessor } from '../api/turmas';
 import { getDisciplinas } from '../api/disciplinas';
+import { getVinculosByTurma } from '../api/vinculos';
 import { getAnosLetivosAccessivel } from '../api/anoLetivo';
 import { getAlunosByTurma } from '../api/alunos';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,6 +26,7 @@ export default function Notas() {
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [disciplinas, setDisciplinas] = useState([]);
+  const [disciplinasFiltradas, setDisciplinasFiltradas] = useState([]);
 
   const [anoLetivoSelecionado, setAnoLetivoSelecionado] = useState('');
   const [turmaSelecionada, setTurmaSelecionada] = useState('');
@@ -49,10 +51,32 @@ export default function Notas() {
         setAnosLetivos(anos);
         setDisciplinas(discs);
         if (anos.length > 0) setAnoLetivoSelecionado(String(anos[0].id));
-        if (discs.length > 0) setDisciplinaSelecionada(String(discs[0].id));
+        if (user.role !== ROLES.Professor && discs.length > 0) {
+          setDisciplinasFiltradas(discs);
+          setDisciplinaSelecionada(String(discs[0].id));
+        }
       })
       .finally(() => setLoadingSelects(false));
   }, []);
+
+  // Turma → disciplinas do professor (só para Professor)
+  useEffect(() => {
+    if (user.role !== ROLES.Professor) return;
+    setDisciplinasFiltradas([]);
+    setDisciplinaSelecionada('');
+    if (!turmaSelecionada) return;
+
+    getVinculosByTurma(turmaSelecionada)
+      .then(({ data }) => {
+        const ids = data
+          .filter((v) => v.professorId === user.id)
+          .map((v) => v.disciplinaId);
+        const filtered = disciplinas.filter((d) => ids.includes(d.id));
+        setDisciplinasFiltradas(filtered);
+        if (filtered.length > 0) setDisciplinaSelecionada(String(filtered[0].id));
+      })
+      .catch(() => setDisciplinasFiltradas([]));
+  }, [turmaSelecionada]);
 
   // Ano letivo → turmas
   useEffect(() => {
@@ -67,7 +91,10 @@ export default function Notas() {
       ? getTurmasByProfessor(user.id, anoLetivoSelecionado)
       : getTurmasByAnoLetivo(anoLetivoSelecionado);
     fetch
-      .then(({ data }) => setTurmas(Array.isArray(data) ? data : data.data ?? []))
+      .then(({ data }) => {
+        const todas = Array.isArray(data) ? data : data.data ?? [];
+        setTurmas(todas.filter((t) => t.segmento !== 0));
+      })
       .catch(() => setTurmas([]))
       .finally(() => setLoadingTurmas(false));
   }, [anoLetivoSelecionado]);
@@ -206,9 +233,10 @@ export default function Notas() {
                 <Form.Select
                   value={disciplinaSelecionada}
                   onChange={(e) => setDisciplinaSelecionada(e.target.value)}
+                  disabled={user.role === ROLES.Professor && !turmaSelecionada}
                 >
                   <option value="">Selecione</option>
-                  {disciplinas.map((d) => (
+                  {disciplinasFiltradas.map((d) => (
                     <option key={d.id} value={d.id}>{d.nome}</option>
                   ))}
                 </Form.Select>

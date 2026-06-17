@@ -53,9 +53,11 @@ src/
 │   ├── frequencia.js
 │   ├── notas.js
 │   ├── desenvolvimentoMaternal.js
+│   ├── diasLetivos.js
+│   ├── relatoAula.js
 │   └── diario.js
 ├── components/
-│   ├── Layout.jsx        # Sidebar + Outlet
+│   ├── Layout.jsx        # Sidebar retrátil + Outlet
 │   └── PrivateRoute.jsx  # Guard de autenticação e autorização por role
 ├── contexts/
 │   └── AuthContext.jsx   # Estado global de autenticação (user, signIn, signOut)
@@ -71,6 +73,7 @@ src/
 │   ├── Frequencia.jsx
 │   ├── Notas.jsx
 │   ├── Maternal.jsx
+│   ├── RelatoAula.jsx
 │   └── Diario.jsx
 ├── utils/
 │   └── constants.js      # Enums de roles e segmentos
@@ -118,30 +121,52 @@ Esses dados são persistidos em `localStorage` (`token` e `user`) e gerenciados 
 | `0` | Admin | Tudo, incluindo gestão de usuários e anos letivos |
 | `1` | Diretor | Gestão (turmas, alunos, vínculos) + acadêmico |
 | `2` | Coordenador | Gestão (turmas, alunos, vínculos) + acadêmico |
-| `3` | Professor | Acadêmico (frequência, notas, maternal) + alunos |
+| `3` | Professor | Acadêmico (frequência, notas, maternal, relato) + alunos |
 | `4` | Aluno | Apenas dashboard e diário |
 
 ### Grupos de acesso usados nas rotas
 
 ```js
 const adminOnly = [Admin]                              // /anoletivo, /usuarios
-const gestao    = [Admin, Diretor, Coordenador]        // /turmas, /vinculos
+const gestao    = [Admin, Diretor, Coordenador]        // /turmas, /disciplinas, /vinculos
 const academico = [Admin, Diretor, Coordenador,
-                   Professor]                          // /frequencia, /notas
+                   Professor]                          // /frequencia, /notas, /relato-aula
 ```
 
 O `PrivateRoute` redireciona para `/login` se não autenticado, ou para `/` se autenticado mas sem permissão para a rota.
 
 ---
 
-## Segmentos de turma
+## Segmentos
 
 | Valor | Label |
 |---|---|
 | `0` | Maternal |
 | `1` | Fundamental |
 
-O segmento determina quais módulos acadêmicos são exibidos (desenvolvimento maternal vs. notas por unidade).
+O segmento é aplicado tanto em **Turmas** quanto em **Disciplinas** e determina quais módulos acadêmicos estão disponíveis (desenvolvimento maternal vs. notas por unidade).
+
+---
+
+## Sidebar
+
+A sidebar é retrátil. Um botão circular na borda direita alterna entre os dois estados:
+
+| Estado | Largura | Exibição |
+|---|---|---|
+| Expandido | `w-64` | Ícone + rótulo de texto, seções de separação, nome/cargo do usuário |
+| Recolhido | `w-16` | Apenas ícones centralizados, tooltip nativo (`title`) ao passar o mouse |
+
+### Menu condicional para Professor
+
+Ao fazer login como Professor, o `Layout` chama `GET /api/turma/professor/{id}` e verifica os segmentos das turmas vinculadas:
+
+| Situação | Notas | Desenvolvimento Maternal |
+|---|---|---|
+| Professor com turmas só Fundamental | ✅ | ❌ |
+| Professor com turmas só Maternal | ❌ | ✅ |
+| Professor com turmas de ambos | ✅ | ✅ |
+| Admin / Diretor / Coordenador | ✅ | ✅ |
 
 ---
 
@@ -151,7 +176,7 @@ O segmento determina quais módulos acadêmicos são exibidos (desenvolvimento m
 
 #### Ano Letivo `/anoletivo`
 - **Acesso:** Admin
-- CRUD completo. Campo: `ano` (número inteiro, ex: 2025).
+- CRUD completo. Campo: `ano` (número inteiro, ex: 2026).
 - Deve ser criado antes de turmas.
 
 #### Turmas `/turmas`
@@ -160,8 +185,9 @@ O segmento determina quais módulos acadêmicos são exibidos (desenvolvimento m
 - Requer ao menos um Ano Letivo cadastrado.
 
 #### Disciplinas `/disciplinas`
-- **Acesso:** Todos autenticados
-- CRUD completo. Campo: `nome`.
+- **Acesso:** Gestão (Admin, Diretor, Coordenador). Professor não tem acesso a este módulo.
+- CRUD completo. Campos: `nome`, `segmento` (Maternal/Fundamental).
+- O segmento determina em quais contextos a disciplina aparece (ex: disciplinas Maternal não aparecem na tela de Notas).
 
 #### Usuários `/usuarios`
 - **Acesso:** Admin
@@ -187,15 +213,18 @@ O segmento determina quais módulos acadêmicos são exibidos (desenvolvimento m
 
 #### Frequência `/frequencia`
 - **Acesso:** Acadêmico
-- Filtros: turma, ano letivo, data (padrão: hoje).
+- Filtros: turma (filtrada por professor quando role=Professor), ano letivo, data (padrão: hoje).
 - Ao selecionar turma + data, carrega os alunos e tenta buscar frequência existente para a data. Se não houver registro, todos ficam marcados como presentes.
 - Toggle por aluno (switch Presente/Falta) com destaque vermelho na linha.
+- **Campo de justificativa de falta:** ao marcar um aluno como ausente, aparece um input de texto para registrar a observação (ex: "Atestado médico"). As observações existentes são carregadas junto com as presenças e salvas no payload do `POST /api/frequencia`.
 - Botões rápidos: "Todos presentes" / "Todos faltaram".
 - Salva via `POST /api/frequencia` (upsert na API — a mesma rota cria ou atualiza).
 
 #### Notas `/notas`
 - **Acesso:** Acadêmico
-- Filtros: turma, disciplina, ano letivo, unidade (1–6 + recuperação final).
+- Filtros: ano letivo, turma, disciplina, unidade (1–6 + recuperação final).
+- **Turmas Maternal são excluídas** da lista — notas são exclusivas do segmento Fundamental.
+- **Para Professor:** ao selecionar a turma, o select de disciplinas é preenchido apenas com as disciplinas que o professor leciona naquela turma, consultando `GET /api/turmadisciplinaprofessor/turma/{id}` e filtrando por `professorId`. Para outros roles, todas as disciplinas são exibidas.
 - Ao selecionar os filtros, carrega alunos e notas existentes para a unidade escolhida.
 - Input numérico por aluno (0–10, passo 0.1). Campo fica vermelho se nota < 6.
 - Salva apenas alunos com campo preenchido via `POST /api/nota` (upsert).
@@ -210,11 +239,19 @@ O segmento determina quais módulos acadêmicos são exibidos (desenvolvimento m
 | 7 | Recuperação Final |
 
 #### Desenvolvimento Maternal `/maternal`
-- **Acesso:** Admin, Professor
+- **Acesso:** Admin, Professor (com turmas Maternal)
 - Exibe apenas turmas do segmento `Maternal`.
 - Filtros: turma, ano letivo, aluno.
 - 4 textareas, uma por bimestre. Carrega registros existentes ao selecionar o aluno.
 - Salva apenas bimestres com conteúdo preenchido via `POST /api/desenvolvimentomaternal` (upsert).
+
+#### Relato de Aula `/relato-aula`
+- **Acesso:** Acadêmico
+- Filtros: ano letivo, turma (filtrada por professor quando role=Professor).
+- Lista todos os dias letivos do ano com status **Registrado** / **Pendente** e preview truncado do texto.
+- Ao clicar em um dia, abre modal com textarea para redigir ou editar o relato.
+- Salva via `POST /api/relatoAula` (upsert).
+- **Exportar PDF:** gera um documento HTML com a tabela completa de relatos (data, nº da aula, resumo de atividade, coluna de rúbrica) e chama `window.print()` em uma nova aba. Não utiliza bibliotecas externas.
 
 #### Diário `/diario`
 - **Acesso:** Todos autenticados
@@ -233,21 +270,23 @@ O segmento determina quais módulos acadêmicos são exibidos (desenvolvimento m
 
 ## Camada de API (`src/api/`)
 
-Todos os módulos exportam funções que retornam promises do Axios. A paginação padrão dos endpoints de listagem é `pageSize=100` (suficiente para selects de combos). Endpoints de lançamento (frequência, nota, desenvolvimento) sempre usam `POST` pois a API implementa upsert.
+Todos os módulos exportam funções que retornam promises do Axios. A paginação padrão dos endpoints de listagem é `pageSize=100` (suficiente para selects de combos). Endpoints de lançamento (frequência, nota, desenvolvimento, relato) sempre usam `POST` pois a API implementa upsert.
 
 | Arquivo | Endpoints principais |
 |---|---|
 | `client.js` | Interceptors de auth e 401 |
 | `auth.js` | `POST /api/auth/login` |
 | `anoLetivo.js` | CRUD `/api/anoletivo` |
-| `turmas.js` | CRUD `/api/turma` |
+| `turmas.js` | CRUD `/api/turma` · `GET /api/turma/professor/{id}` · `GET /api/turma/ano-letivo/{id}` |
 | `disciplinas.js` | CRUD `/api/disciplina` |
-| `usuarios.js` | CRUD `/api/usuario` |
-| `alunos.js` | CRUD `/api/aluno` + `GET /api/aluno/turma/{id}` |
-| `vinculos.js` | CRUD `/api/vinculo` |
+| `usuarios.js` | CRUD `/api/user` |
+| `alunos.js` | CRUD `/api/aluno` · `GET /api/aluno/turma/{id}` |
+| `vinculos.js` | `POST/DELETE /api/turmadisciplinaprofessor` · `GET /api/turmadisciplinaprofessor/turma/{id}` |
 | `frequencia.js` | `POST /api/frequencia` · `GET /api/frequencia/turma/{id}/data/{data}` |
-| `notas.js` | `POST /api/nota` · `GET /api/nota/turma/{t}/disciplina/{d}/anoletivo/{a}` |
-| `desenvolvimentoMaternal.js` | `POST /api/desenvolvimentomaternal` · `GET /api/desenvolvimentomaternal/aluno/{a}/anoletivo/{ano}` |
+| `notas.js` | `POST /api/nota` · `GET /api/nota/turma/{t}/disciplina/{d}/ano/{a}` |
+| `desenvolvimentoMaternal.js` | `POST /api/desenvolvimentomaternal` · `GET /api/desenvolvimentomaternal/aluno/{a}/ano/{ano}` |
+| `diasLetivos.js` | `GET /api/diaLetivo/ano-letivo/{id}` · `POST /api/diaLetivo/lote` · `DELETE /api/diaLetivo/{id}` |
+| `relatoAula.js` | `POST /api/relatoAula` · `GET /api/relatoAula/turma/{t}/ano/{a}` |
 | `diario.js` | `GET /api/diario/maternal/{a}/{ano}` · `GET /api/diario/fundamental/{a}/{ano}` |
 
 ---
@@ -276,7 +315,7 @@ useEffect(() => {
 
 ### Upsert nos lançamentos
 
-Os endpoints de frequência, notas e desenvolvimento maternal aceitam `POST` para criar ou atualizar. O frontend sempre usa `POST`, sem lógica de diferenciação create/update.
+Os endpoints de frequência, notas, desenvolvimento maternal e relato de aula aceitam `POST` para criar ou atualizar. O frontend sempre usa `POST`, sem lógica de diferenciação create/update.
 
 ### Soft delete
 
@@ -290,15 +329,18 @@ A sequência abaixo respeita as dependências entre entidades:
 
 1. **Ano Letivo** — base para tudo
 2. **Turmas** — dependem do ano letivo e do segmento
-3. **Disciplinas** — independentes
+3. **Disciplinas** — independentes, mas com segmento definido
 4. **Usuários** — criar contas com roles adequados (Admin, Professor, Aluno…)
 5. **Alunos** — vinculam um usuário role=Aluno a uma turma/ano
 6. **Vínculos** — associam Professor + Disciplina + Turma/Ano
-7. **Lançamentos** — Frequência, Notas, Desenvolvimento Maternal
+7. **Dias Letivos** — calendário do ano (POST /lote)
+8. **Lançamentos** — Frequência, Notas, Desenvolvimento Maternal, Relato de Aula
 
 ---
 
-## Exportação de PDF (Diário)
+## Exportação de PDF
+
+### Diário
 
 O diário usa `window.print()` com CSS nativo, sem dependências adicionais. O conteúdo a ser impresso deve estar dentro de `<div id="diario-content">`. O `@media print` em `index.css`:
 
@@ -306,6 +348,10 @@ O diário usa `window.print()` com CSS nativo, sem dependências adicionais. O c
 - Exibe somente `#diario-content` e seus filhos
 - Remove sombras e ajusta bordas para impressão
 - Evita quebra de página dentro de cards e linhas de tabela
+
+### Relato de Aula
+
+O relato usa uma abordagem diferente: gera um documento HTML completo em memória com estilos inline, abre numa nova aba via `window.open` e chama `print()`. Isso permite um layout de tabela dedicado (data, nº da aula, resumo, rúbrica) sem depender do CSS global da aplicação.
 
 ---
 

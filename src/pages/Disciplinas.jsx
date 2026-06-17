@@ -17,9 +17,15 @@ import {
   deleteDisciplina,
 } from "../api/disciplinas";
 import { useAuth } from "../contexts/AuthContext";
-import { ROLES } from "../utils/constants";
+import { SEGMENTO_LABELS, ROLES } from "../utils/constants";
 
-const defaultForm = { nome: "" };
+const SEGMENTO_OPTIONS = [
+  { value: 0, label: "Maternal" },
+  { value: 1, label: "Fundamental" },
+];
+const SEGMENTO_COLORS = { 0: "warning", 1: "primary" };
+
+const defaultForm = { nome: "", segmento: 0 };
 
 export default function Disciplinas() {
   const { user } = useAuth();
@@ -55,9 +61,13 @@ export default function Disciplinas() {
 
   function openEdit(item) {
     setEditItem(item);
-    setForm({ nome: item.nome });
+    setForm({ nome: item.nome, segmento: item.segmento });
     setError("");
     setShowModal(true);
+  }
+
+  function set(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   async function handleSave(e) {
@@ -65,10 +75,11 @@ export default function Disciplinas() {
     setSaving(true);
     setError("");
     try {
+      const payload = { nome: form.nome, segmento: Number(form.segmento) };
       if (editItem) {
-        await updateDisciplina(editItem.id, form);
+        await updateDisciplina(editItem.id, payload);
       } else {
-        await createDisciplina(form);
+        await createDisciplina(payload);
       }
       setShowModal(false);
       load();
@@ -97,7 +108,11 @@ export default function Disciplinas() {
           <h5 className="fw-bold text-slate-800 mb-0">Disciplinas</h5>
         </div>
         {canEdit && (
-          <Button variant="primary" onClick={openCreate}>
+          <Button
+            variant="primary"
+            className="d-flex align-items-center justify-content-between mb-4"
+            onClick={openCreate}
+          >
             <Plus size={14} className="me-1" />
             Nova Disciplina
           </Button>
@@ -119,6 +134,7 @@ export default function Disciplinas() {
               <thead className="table-light">
                 <tr>
                   <th className="ps-4">Nome</th>
+                  <th>Segmento</th>
                   <th>Status</th>
                   {canEdit && <th style={{ width: 100 }}>Ações</th>}
                 </tr>
@@ -127,6 +143,11 @@ export default function Disciplinas() {
                 {items.map((item) => (
                   <tr key={item.id}>
                     <td className="ps-4 fw-medium">{item.nome}</td>
+                    <td>
+                      <Badge bg={SEGMENTO_COLORS[item.segmento]}>
+                        {SEGMENTO_LABELS[item.segmento]}
+                      </Badge>
+                    </td>
                     <td>
                       <Badge bg={item.ativo ? "success" : "secondary"}>
                         {item.ativo ? "Ativa" : "Inativa"}
@@ -173,16 +194,30 @@ export default function Disciplinas() {
                 {error}
               </Alert>
             )}
-            <Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label className="small fw-medium">Nome</Form.Label>
               <Form.Control
                 type="text"
                 value={form.nome}
-                onChange={(e) => setForm({ nome: e.target.value })}
+                onChange={(e) => set("nome", e.target.value)}
                 placeholder="Ex: Matemática"
                 required
                 autoFocus
               />
+            </Form.Group>
+            <Form.Group>
+              <Form.Label className="small fw-medium">Segmento</Form.Label>
+              <Form.Select
+                value={form.segmento}
+                onChange={(e) => set("segmento", Number(e.target.value))}
+                required
+              >
+                {SEGMENTO_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </Form.Select>
             </Form.Group>
           </Modal.Body>
           <Modal.Footer>
