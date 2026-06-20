@@ -1,8 +1,14 @@
 import axios from 'axios';
 
-const client = axios.create({
-  baseURL: 'http://localhost:5009',
-});
+const API_URLS = {
+  tialulu:  import.meta.env.VITE_API_TIALULU,
+  tiadinha: import.meta.env.VITE_API_TIADINHA,
+};
+
+const subdomain = window.location.hostname.split('.')[0];
+const baseURL = API_URLS[subdomain] ?? 'http://localhost:5009';
+
+const client = axios.create({ baseURL });
 
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
