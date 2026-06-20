@@ -1,3 +1,8 @@
+# Env files (nunca commitar valores reais)
+.env
+.env.local
+.env.production
+
 # Logs
 logs
 *.log
