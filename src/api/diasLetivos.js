@@ -2,7 +2,7 @@ import client from './client';
 
 export const getDiasLetivosByAno = (anoLetivoId, segmento) =>
   client.get(`/api/diaLetivo/ano-letivo/${anoLetivoId}`, {
-    params: segmento ? { segmento } : {},
+    params: segmento !== undefined && segmento !== null ? { segmento } : {},
   });
 
 export const createDiasLetivosLote = (data) =>

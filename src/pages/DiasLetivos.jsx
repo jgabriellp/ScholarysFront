@@ -4,7 +4,7 @@ import { CalendarDays } from 'lucide-react';
 import { getDiasLetivosByAno, createDiasLetivosLote, deleteDiaLetivo } from '../api/diasLetivos';
 import { getAnoLetivos } from '../api/anoLetivo';
 import { useAuth } from '../contexts/AuthContext';
-import { ROLES, SEGMENTO_LABELS, SEGMENTO_OPTIONS } from '../utils/constants';
+import { ROLES, SEGMENTO_OPTIONS } from '../utils/constants';
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MESES = [
@@ -124,7 +124,7 @@ export default function DiasLetivos() {
     setAnoAtual(ano ?? null);
 
     setLoadingDias(true);
-    getDiasLetivosByAno(anoSelecionado, SEGMENTO_LABELS[segmentoSelecionado])
+    getDiasLetivosByAno(anoSelecionado, segmentoSelecionado)
       .then(({ data }) => setSavedDays(Array.isArray(data) ? data : (data.data ?? [])))
       .catch(() => setSavedDays([]))
       .finally(() => setLoadingDias(false));
@@ -162,7 +162,7 @@ export default function DiasLetivos() {
         ops.push(
           createDiasLetivosLote({
             anoLetivoId: Number(anoSelecionado),
-            segmento: SEGMENTO_LABELS[segmentoSelecionado],
+            segmento: segmentoSelecionado,
             datas: [...pendingAdd],
           })
         );
@@ -170,7 +170,7 @@ export default function DiasLetivos() {
       for (const id of pendingRemove) ops.push(deleteDiaLetivo(id));
       await Promise.all(ops);
 
-      const { data } = await getDiasLetivosByAno(anoSelecionado, SEGMENTO_LABELS[segmentoSelecionado]);
+      const { data } = await getDiasLetivosByAno(anoSelecionado, segmentoSelecionado);
       setSavedDays(Array.isArray(data) ? data : (data.data ?? []));
       setPendingAdd(new Set());
       setPendingRemove(new Set());
