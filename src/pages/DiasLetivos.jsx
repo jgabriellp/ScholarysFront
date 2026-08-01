@@ -4,7 +4,7 @@ import { CalendarDays } from 'lucide-react';
 import { getDiasLetivosByAno, createDiasLetivosLote, deleteDiaLetivo } from '../api/diasLetivos';
 import { getAnoLetivos } from '../api/anoLetivo';
 import { useAuth } from '../contexts/AuthContext';
-import { ROLES } from '../utils/constants';
+import { ROLES, SEGMENTO_LABELS, SEGMENTO_OPTIONS } from '../utils/constants';
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MESES = [
@@ -92,6 +92,7 @@ export default function DiasLetivos() {
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [anoSelecionado, setAnoSelecionado] = useState('');
   const [anoAtual, setAnoAtual] = useState(null);
+  const [segmentoSelecionado, setSegmentoSelecionado] = useState(1);
   const [savedDays, setSavedDays] = useState([]);
   const [pendingAdd, setPendingAdd] = useState(new Set());
   const [pendingRemove, setPendingRemove] = useState(new Set());
@@ -123,11 +124,11 @@ export default function DiasLetivos() {
     setAnoAtual(ano ?? null);
 
     setLoadingDias(true);
-    getDiasLetivosByAno(anoSelecionado)
+    getDiasLetivosByAno(anoSelecionado, SEGMENTO_LABELS[segmentoSelecionado])
       .then(({ data }) => setSavedDays(Array.isArray(data) ? data : (data.data ?? [])))
       .catch(() => setSavedDays([]))
       .finally(() => setLoadingDias(false));
-  }, [anoSelecionado]);
+  }, [anoSelecionado, segmentoSelecionado]);
 
   // dateStr → { id, data }
   const savedMap = new Map(
@@ -161,6 +162,7 @@ export default function DiasLetivos() {
         ops.push(
           createDiasLetivosLote({
             anoLetivoId: Number(anoSelecionado),
+            segmento: SEGMENTO_LABELS[segmentoSelecionado],
             datas: [...pendingAdd],
           })
         );
@@ -168,7 +170,7 @@ export default function DiasLetivos() {
       for (const id of pendingRemove) ops.push(deleteDiaLetivo(id));
       await Promise.all(ops);
 
-      const { data } = await getDiasLetivosByAno(anoSelecionado);
+      const { data } = await getDiasLetivosByAno(anoSelecionado, SEGMENTO_LABELS[segmentoSelecionado]);
       setSavedDays(Array.isArray(data) ? data : (data.data ?? []));
       setPendingAdd(new Set());
       setPendingRemove(new Set());
@@ -213,6 +215,19 @@ export default function DiasLetivos() {
               >
                 {anosLetivos.map((a) => (
                   <option key={a.id} value={a.id}>{a.ano}</option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+
+            <Form.Group style={{ minWidth: 160 }}>
+              <Form.Label className="small fw-medium mb-1">Segmento</Form.Label>
+              <Form.Select
+                value={segmentoSelecionado}
+                onChange={(e) => setSegmentoSelecionado(Number(e.target.value))}
+                style={{ maxWidth: 160 }}
+              >
+                {SEGMENTO_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </Form.Select>
             </Form.Group>

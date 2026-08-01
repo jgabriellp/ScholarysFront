@@ -28,7 +28,7 @@ export default function Dashboard() {
       <div className="mb-4">
         <h5 className="fw-bold text-slate-800 mb-0">Olá, {user.nome}!</h5>
         <p className="text-muted small mb-0">
-          {ROLE_LABELS[user.role]} · Bem-vindo ao Scholarys.
+          {ROLE_LABELS[user.role]} · Bem-vindo ao Schoolarys.
         </p>
       </div>
 

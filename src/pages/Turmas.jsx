@@ -19,15 +19,13 @@ import {
   deleteTurma,
 } from "../api/turmas";
 import { getAnosLetivosAccessivel } from "../api/anoLetivo";
-import { SEGMENTO_LABELS, ROLES } from "../utils/constants";
+import {
+  SEGMENTO_LABELS,
+  SEGMENTO_OPTIONS,
+  SEGMENTO_COLORS,
+  ROLES,
+} from "../utils/constants";
 import { useAuth } from "../contexts/AuthContext";
-
-const SEGMENTO_OPTIONS = [
-  { value: 0, label: "Maternal" },
-  { value: 1, label: "Fundamental" },
-];
-
-const SEGMENTO_COLORS = { 0: "warning", 1: "primary" };
 
 const defaultForm = { nome: "", segmento: 0, anoLetivoId: "" };
 

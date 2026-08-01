@@ -17,13 +17,12 @@ import {
   deleteDisciplina,
 } from "../api/disciplinas";
 import { useAuth } from "../contexts/AuthContext";
-import { SEGMENTO_LABELS, ROLES } from "../utils/constants";
-
-const SEGMENTO_OPTIONS = [
-  { value: 0, label: "Maternal" },
-  { value: 1, label: "Fundamental" },
-];
-const SEGMENTO_COLORS = { 0: "warning", 1: "primary" };
+import {
+  SEGMENTO_LABELS,
+  SEGMENTO_OPTIONS,
+  SEGMENTO_COLORS,
+  ROLES,
+} from "../utils/constants";
 
 const defaultForm = { nome: "", segmento: 0 };
 

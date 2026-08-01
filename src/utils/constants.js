@@ -23,3 +23,10 @@ export const SEGMENTO_LABELS = {
   0: 'Maternal',
   1: 'Fundamental',
 };
+
+export const SEGMENTO_OPTIONS = [
+  { value: 0, label: 'Maternal' },
+  { value: 1, label: 'Fundamental' },
+];
+
+export const SEGMENTO_COLORS = { 0: 'warning', 1: 'primary' };

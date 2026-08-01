@@ -98,7 +98,7 @@ export default function Layout() {
             <span className="text-white font-bold text-lg">S</span>
           ) : (
             <>
-              <h1 className="text-white font-bold text-lg leading-tight">Scholarys</h1>
+              <h1 className="text-white font-bold text-lg leading-tight">Schoolarys</h1>
               <p className="text-slate-400 text-xs mt-0.5">Sistema de Gestão Escolar</p>
             </>
           )}

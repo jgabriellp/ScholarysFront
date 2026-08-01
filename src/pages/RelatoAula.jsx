@@ -17,7 +17,7 @@ import { getDiasLetivosByAno } from "../api/diasLetivos";
 import { getTurmasByAnoLetivo, getTurmasByProfessor } from "../api/turmas";
 import { getAnosLetivosAccessivel } from "../api/anoLetivo";
 import { useAuth } from "../contexts/AuthContext";
-import { ROLES } from "../utils/constants";
+import { ROLES, SEGMENTO_LABELS } from "../utils/constants";
 
 function fmtData(dateStr) {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("pt-BR");
@@ -88,9 +88,11 @@ export default function RelatoAula() {
     setRelatos([]);
     if (!turmaSelecionada || !anoSelecionado) return;
 
+    const turma = turmas.find((t) => String(t.id) === turmaSelecionada);
+
     setLoadingConteudo(true);
     Promise.all([
-      getDiasLetivosByAno(anoSelecionado),
+      getDiasLetivosByAno(anoSelecionado, SEGMENTO_LABELS[turma?.segmento]),
       getRelatosByTurmaAno(turmaSelecionada, anoSelecionado),
     ])
       .then(([diasRes, relatosRes]) => {

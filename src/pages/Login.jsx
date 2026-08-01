@@ -41,7 +41,7 @@ export default function Login() {
             >
               <GraduationCap size={26} color="white" />
             </div>
-            <h5 className="fw-bold text-dark mb-0">Scholarys</h5>
+            <h5 className="fw-bold text-dark mb-0">Schoolarys</h5>
             <p className="text-muted small mb-0">Sistema de Gestão Escolar</p>
           </div>
 

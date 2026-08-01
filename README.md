@@ -1,6 +1,6 @@
-# Scholarys — Frontend
+# Schoolarys — Frontend
 
-Interface web do sistema de gestão escolar Scholarys, construída em React + Vite. Consome a API REST **SchoolAPI** (.NET 8) rodando localmente.
+Interface web do sistema de gestão escolar Schoolarys, construída em React + Vite. Consome a API REST **SchoolAPI** (.NET 8) rodando localmente.
 
 ---
 

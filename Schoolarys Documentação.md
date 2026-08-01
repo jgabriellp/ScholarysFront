@@ -1,4 +1,4 @@
-# Scholarys — Documentação do Sistema
+# Schoolarys — Documentação do Sistema
 
 > Sistema de Gestão Escolar desenvolvido para facilitar o acompanhamento acadêmico de alunos, o lançamento de registros pedagógicos e a geração de relatórios consolidados para gestores, professores e responsáveis.
 
@@ -6,7 +6,7 @@
 
 ## Visão Geral
 
-O Scholarys centraliza toda a vida acadêmica de uma instituição de ensino em uma única plataforma web. Gestores têm visibilidade completa sobre turmas, vínculos e indicadores; professores acessam rapidamente as turmas em que lecionam para registrar frequências, notas e avaliações de desenvolvimento; alunos consultam seu próprio diário escolar a qualquer momento.
+O Schoolarys centraliza toda a vida acadêmica de uma instituição de ensino em uma única plataforma web. Gestores têm visibilidade completa sobre turmas, vínculos e indicadores; professores acessam rapidamente as turmas em que lecionam para registrar frequências, notas e avaliações de desenvolvimento; alunos consultam seu próprio diário escolar a qualquer momento.
 
 ---
 
@@ -28,7 +28,7 @@ O sistema possui cinco perfis com acesso progressivamente mais restrito:
 
 ## Módulo Acadêmico
 
-O módulo Acadêmico é o coração operacional do Scholarys. É aqui que professores registram o dia a dia da sala de aula e que gestores acompanham o desempenho das turmas.
+O módulo Acadêmico é o coração operacional do Schoolarys. É aqui que professores registram o dia a dia da sala de aula e que gestores acompanham o desempenho das turmas.
 
 ---
 
@@ -146,7 +146,7 @@ O módulo Acadêmico é o coração operacional do Scholarys. É aqui que profes
 
 ## Segmentos de Ensino
 
-O Scholarys suporta dois segmentos com fluxos pedagógicos distintos:
+O Schoolarys suporta dois segmentos com fluxos pedagógicos distintos:
 
 | Segmento | Avaliação de notas | Avaliação de desenvolvimento | Frequência |
 |---|:---:|:---:|:---:|
@@ -177,4 +177,4 @@ Gestão / Aluno:
 
 ---
 
-*Scholarys — Sistema de Gestão Escolar*
+*Schoolarys — Sistema de Gestão Escolar*
