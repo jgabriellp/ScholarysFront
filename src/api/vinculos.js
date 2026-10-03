@@ -6,5 +6,8 @@ export const getVinculosByTurma = (turmaId) =>
 export const createVinculo = (data) =>
   client.post('/api/turmadisciplinaprofessor', data);
 
+export const updateVinculo = (id, data) =>
+  client.put(`/api/turmadisciplinaprofessor/${id}`, data);
+
 export const deleteVinculo = (id) =>
   client.delete(`/api/turmadisciplinaprofessor/${id}`);

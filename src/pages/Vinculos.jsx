@@ -10,17 +10,22 @@ import {
   Spinner,
   Alert,
 } from "react-bootstrap";
-import { GitMerge, Plus, Trash2 } from "lucide-react";
+import { GitMerge, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   getVinculosByTurma,
   createVinculo,
+  updateVinculo,
   deleteVinculo,
 } from "../api/vinculos";
 import { getTurmasByAnoLetivo } from "../api/turmas";
 import { getDisciplinas } from "../api/disciplinas";
 import { getAllUsuarios } from "../api/usuarios";
 import { getAnosLetivosAccessivel } from "../api/anoLetivo";
-import { ROLES } from "../utils/constants";
+import {
+  ROLES,
+  DIAS_SEMANA_OPTIONS,
+  DIAS_SEMANA_LABELS,
+} from "../utils/constants";
 import { useAuth } from "../contexts/AuthContext";
 
 const defaultForm = {
@@ -28,7 +33,16 @@ const defaultForm = {
   disciplinaId: "",
   professorId: "",
   anoLetivoId: "",
+  diasSemana: [],
 };
+
+function fmtDiasSemana(dias) {
+  if (!dias || dias.length === 0) return "Todos os dias";
+  return [...dias]
+    .sort((a, b) => a - b)
+    .map((d) => DIAS_SEMANA_LABELS[d])
+    .join(", ");
+}
 
 export default function Vinculos() {
   const { user } = useAuth();
@@ -49,6 +63,7 @@ export default function Vinculos() {
 
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(defaultForm);
+  const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -115,12 +130,36 @@ export default function Vinculos() {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
+  function toggleDia(dia) {
+    setForm((f) => ({
+      ...f,
+      diasSemana: f.diasSemana.includes(dia)
+        ? f.diasSemana.filter((d) => d !== dia)
+        : [...f.diasSemana, dia],
+    }));
+  }
+
   function openCreate() {
+    setEditingId(null);
     setForm({
       turmaId: turmaSelecionada,
       disciplinaId: disciplinas[0]?.id ?? "",
       professorId: professores[0]?.id ?? "",
       anoLetivoId: anoLetivoFiltro,
+      diasSemana: [],
+    });
+    setError("");
+    setShowModal(true);
+  }
+
+  function openEdit(item) {
+    setEditingId(item.id);
+    setForm({
+      turmaId: String(item.turmaId),
+      disciplinaId: String(item.disciplinaId),
+      professorId: String(item.professorId),
+      anoLetivoId: String(item.anoLetivoId),
+      diasSemana: item.diasSemana ?? [],
     });
     setError("");
     setShowModal(true);
@@ -131,18 +170,26 @@ export default function Vinculos() {
     setSaving(true);
     setError("");
     try {
-      await createVinculo({
+      const payload = {
         turmaId: Number(form.turmaId),
         disciplinaId: Number(form.disciplinaId),
         professorId: Number(form.professorId),
         anoLetivoId: Number(form.anoLetivoId),
-      });
+        diasSemana: [...form.diasSemana].sort((a, b) => a - b),
+      };
+      if (editingId) {
+        await updateVinculo(editingId, payload);
+      } else {
+        await createVinculo(payload);
+      }
       setShowModal(false);
       reload();
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          "Erro ao salvar. Verifique se o vínculo já existe.",
+          (editingId
+            ? "Erro ao salvar o vínculo."
+            : "Erro ao salvar. Verifique se o vínculo já existe."),
       );
     } finally {
       setSaving(false);
@@ -267,7 +314,8 @@ export default function Vinculos() {
                 <tr>
                   <th className="ps-4">Disciplina</th>
                   <th>Professor</th>
-                  {canEdit && <th style={{ width: 80 }}>Ações</th>}
+                  <th>Dias de aula</th>
+                  {canEdit && <th style={{ width: 100 }}>Ações</th>}
                 </tr>
               </thead>
               <tbody>
@@ -275,15 +323,27 @@ export default function Vinculos() {
                   <tr key={item.id}>
                     <td className="ps-4 fw-medium">{item.disciplinaNome}</td>
                     <td>{item.professorNome}</td>
+                    <td className="text-muted small">
+                      {fmtDiasSemana(item.diasSemana)}
+                    </td>
                     {canEdit && (
                       <td>
-                        <Button
-                          size="sm"
-                          variant="outline-danger"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 size={12} />
-                        </Button>
+                        <div className="d-flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline-secondary"
+                            onClick={() => openEdit(item)}
+                          >
+                            <Pencil size={12} />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline-danger"
+                            onClick={() => handleDelete(item.id)}
+                          >
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -297,7 +357,9 @@ export default function Vinculos() {
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
         <Form onSubmit={handleSave}>
           <Modal.Header closeButton>
-            <Modal.Title className="fs-6 fw-bold">Novo Vínculo</Modal.Title>
+            <Modal.Title className="fs-6 fw-bold">
+              {editingId ? "Editar Vínculo" : "Novo Vínculo"}
+            </Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {error && (
@@ -376,6 +438,30 @@ export default function Vinculos() {
                       </option>
                     ))}
                   </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col xs={12}>
+                <Form.Group>
+                  <Form.Label className="small fw-medium">
+                    Dias de aula
+                  </Form.Label>
+                  <div>
+                    {DIAS_SEMANA_OPTIONS.map((d) => (
+                      <Form.Check
+                        key={d.value}
+                        inline
+                        type="checkbox"
+                        id={`dia-semana-${d.value}`}
+                        label={d.label}
+                        checked={form.diasSemana.includes(d.value)}
+                        onChange={() => toggleDia(d.value)}
+                      />
+                    ))}
+                  </div>
+                  <Form.Text className="text-muted">
+                    Deixe todos desmarcados se o professor tem aula todos os
+                    dias.
+                  </Form.Text>
                 </Form.Group>
               </Col>
             </Row>
