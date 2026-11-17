@@ -20,7 +20,7 @@ import {
 import { getTurmasByAnoLetivo } from "../api/turmas";
 import { getDisciplinas } from "../api/disciplinas";
 import { getAllUsuarios } from "../api/usuarios";
-import { getAnosLetivosAccessivel } from "../api/anoLetivo";
+import { carregarAnosLetivos } from "../api/anoLetivo";
 import {
   ROLES,
   DIAS_SEMANA_OPTIONS,
@@ -70,17 +70,17 @@ export default function Vinculos() {
   // Mount: anos letivos, disciplinas e professores (independentes de filtro)
   useEffect(() => {
     Promise.all([
-      getAnosLetivosAccessivel(),
+      carregarAnosLetivos(),
       getDisciplinas(),
       getAllUsuarios(),
     ])
-      .then(([anos, discRes, usuariosRes]) => {
+      .then(([{ anos, anoCorrenteId }, discRes, usuariosRes]) => {
         setAnosLetivos(anos);
         setDisciplinas(discRes.data.data);
         setProfessores(
           usuariosRes.data.data.filter((u) => u.role === ROLES.Professor),
         );
-        if (anos.length > 0) setAnoLetivoFiltro(String(anos[0].id));
+        setAnoLetivoFiltro(anoCorrenteId);
       })
       .finally(() => setLoadingSelects(false));
   }, []);

@@ -178,6 +178,7 @@ Ao fazer login como Professor, o `Layout` chama `GET /api/turma/professor/{id}` 
 - **Acesso:** Admin
 - CRUD completo. Campo: `ano` (número inteiro, ex: 2026).
 - Deve ser criado antes de turmas.
+- Pode haver mais de um ano cadastrado ao mesmo tempo (ex.: 2026 em andamento e 2027 para matrículas). Todas as telas abrem no **ano corrente** devolvido por `GET /api/AnoLetivo/ativo` (helper `carregarAnosLetivos()` em `src/api/anoLetivo.js`), nunca no maior ano da lista.
 
 #### Turmas `/turmas`
 - **Acesso:** Gestão
@@ -198,6 +199,8 @@ Ao fazer login como Professor, o `Layout` chama `GET /api/turma/professor/{id}` 
 #### Alunos `/alunos`
 - **Acesso:** Gestão + Professor
 - CRUD com paginação. Campos: `nome`, `numeroChamada`, `dataNascimento`, `turmaId`, `anoLetivoId`, `userId`.
+- `anoLetivoId` vem sempre da turma escolhida (não é editável). Erros 400 da API (turma de outro ano, usuário já matriculado no ano) são exibidos no modal.
+- **Renovação de matrícula:** cadastro novo na turma do novo ano reaproveitando o mesmo `userId` (opção "Renovação" no modal, que copia nome e data de nascimento da matrícula anterior). Nunca editar o cadastro do ano anterior para trocar de turma.
 - O campo `userId` vincula o aluno a uma conta de usuário com role `4` (Aluno).
 - Requer turmas e usuários com role Aluno cadastrados.
 

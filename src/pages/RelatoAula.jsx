@@ -16,7 +16,7 @@ import { getRelatosByTurmaAno, saveRelato } from "../api/relatoAula";
 import { getDiasLetivosByAno } from "../api/diasLetivos";
 import { getTurmasByAnoLetivo, getTurmasByProfessor } from "../api/turmas";
 import { getVinculosByTurma } from "../api/vinculos";
-import { getAnosLetivosAccessivel } from "../api/anoLetivo";
+import { carregarAnosLetivos } from "../api/anoLetivo";
 import { useAuth } from "../contexts/AuthContext";
 import { ROLES } from "../utils/constants";
 
@@ -105,10 +105,10 @@ export default function RelatoAula() {
 
   // Mount: anos letivos
   useEffect(() => {
-    getAnosLetivosAccessivel()
-      .then((anos) => {
+    carregarAnosLetivos()
+      .then(({ anos, anoCorrenteId }) => {
         setAnosLetivos(anos);
-        if (anos.length > 0) setAnoSelecionado(String(anos[0].id));
+        setAnoSelecionado(anoCorrenteId);
       })
       .finally(() => setLoadingSelects(false));
   }, []);

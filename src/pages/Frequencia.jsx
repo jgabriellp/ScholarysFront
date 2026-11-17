@@ -12,7 +12,7 @@ import {
 import { ClipboardList } from "lucide-react";
 import { getFrequenciaByTurmaData, lancaFrequencia } from "../api/frequencia";
 import { getTurmasByAnoLetivo, getTurmasByProfessor } from "../api/turmas";
-import { getAnosLetivosAccessivel } from "../api/anoLetivo";
+import { carregarAnosLetivos } from "../api/anoLetivo";
 import { getAlunosByTurma } from "../api/alunos";
 import { useAuth } from "../contexts/AuthContext";
 import { ROLES } from "../utils/constants";
@@ -39,12 +39,12 @@ export default function Frequencia() {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
-  // Mount: carrega anos letivos e seleciona o primeiro
+  // Mount: carrega anos letivos e seleciona o ano corrente
   useEffect(() => {
-    getAnosLetivosAccessivel()
-      .then((anos) => {
+    carregarAnosLetivos()
+      .then(({ anos, anoCorrenteId }) => {
         setAnosLetivos(anos);
-        if (anos.length > 0) setAnoLetivoSelecionado(String(anos[0].id));
+        setAnoLetivoSelecionado(anoCorrenteId);
       })
       .finally(() => setLoadingSelects(false));
   }, []);

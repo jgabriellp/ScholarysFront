@@ -15,5 +15,8 @@ export const deleteAluno = (id) =>
 export const getAlunosByTurma = (turmaId) =>
   client.get(`/api/aluno/turma/${turmaId}`);
 
-export const getAlunoByUsuario = (userId) =>
-  client.get(`/api/aluno/usuario/${userId}`);
+// Sem anoLetivoId devolve o cadastro do ano corrente; com ele, o histórico daquele ano
+export const getAlunoByUsuario = (userId, anoLetivoId) =>
+  client.get(`/api/aluno/usuario/${userId}`, {
+    params: anoLetivoId ? { anoLetivoId } : {},
+  });

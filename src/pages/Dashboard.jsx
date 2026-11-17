@@ -1,20 +1,37 @@
 import { useState, useEffect } from 'react';
-import { Card, Row, Col, Spinner } from 'react-bootstrap';
+import { Card, Row, Col, Spinner, Form } from 'react-bootstrap';
 import { Users, GraduationCap, BookOpen, UserCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS } from '../utils/constants';
 import { getDashboard } from '../api/dashboard';
+import { carregarAnosLetivos } from '../api/anoLetivo';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [anosLetivos, setAnosLetivos] = useState([]);
+  const [anoCorrenteId, setAnoCorrenteId] = useState('');
+  const [anoSelecionado, setAnoSelecionado] = useState('');
 
   useEffect(() => {
-    getDashboard()
-      .then(({ data }) => setStats(data))
-      .finally(() => setLoading(false));
+    carregarAnosLetivos()
+      .then(({ anos, anoCorrenteId }) => {
+        setAnosLetivos(anos);
+        setAnoCorrenteId(anoCorrenteId);
+        setAnoSelecionado(anoCorrenteId);
+      })
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    // Ano corrente: sem parâmetro (o backend já devolve o ano corrente)
+    const anoParam = anoSelecionado && anoSelecionado !== anoCorrenteId ? anoSelecionado : undefined;
+    getDashboard(anoParam)
+      .then(({ data }) => setStats(data))
+      .catch(() => setStats(null))
+      .finally(() => setLoading(false));
+  }, [anoSelecionado, anoCorrenteId]);
 
   const cards = [
     { label: 'Turmas',      value: stats?.turmasCount,      icon: Users,         color: 'text-blue-600',   bg: 'bg-blue-50'   },
@@ -25,11 +42,33 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="mb-4">
-        <h5 className="fw-bold text-slate-800 mb-0">Olá, {user.nome}!</h5>
-        <p className="text-muted small mb-0">
-          {ROLE_LABELS[user.role]} · Bem-vindo ao Schoolarys.
-        </p>
+      <div className="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+        <div>
+          <h5 className="fw-bold text-slate-800 mb-0">Olá, {user.nome}!</h5>
+          <p className="text-muted small mb-0">
+            {ROLE_LABELS[user.role]} · Bem-vindo ao Schoolarys.
+          </p>
+        </div>
+        {anosLetivos.length > 1 && (
+          <Form.Group>
+            <Form.Label className="small fw-medium mb-1">Ano Letivo</Form.Label>
+            <Form.Select
+              size="sm"
+              value={anoSelecionado}
+              onChange={(e) => {
+                setLoading(true);
+                setAnoSelecionado(e.target.value);
+              }}
+              style={{ minWidth: 140 }}
+            >
+              {anosLetivos.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.ano}{String(a.id) === anoCorrenteId ? ' (atual)' : ''}
+                </option>
+              ))}
+            </Form.Select>
+          </Form.Group>
+        )}
       </div>
 
       <Row className="g-3">

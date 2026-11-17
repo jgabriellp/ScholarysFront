@@ -16,10 +16,11 @@ import {
   createAluno,
   updateAluno,
   deleteAluno,
+  getAlunoByUsuario,
 } from "../api/alunos";
 import { getTurmasByAnoLetivo, getTurmasByProfessor } from "../api/turmas";
 import { getAllUsuarios } from "../api/usuarios";
-import { getAnosLetivosAccessivel } from "../api/anoLetivo";
+import { carregarAnosLetivos } from "../api/anoLetivo";
 import { ROLES } from "../utils/constants";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -28,7 +29,6 @@ const defaultForm = {
   numeroChamada: "",
   dataNascimento: "",
   turmaId: "",
-  anoLetivoId: "",
   userId: "",
 };
 
@@ -51,18 +51,22 @@ export default function Alunos() {
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState(defaultForm);
+  // "novo" = primeiro cadastro; "renovacao" = aluno que já estudou aqui (mesmo login)
+  const [modo, setModo] = useState("novo");
+  const [buscandoAnterior, setBuscandoAnterior] = useState(false);
+  const [infoAnterior, setInfoAnterior] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   // Carrega anos letivos e usuários aluno no mount
   useEffect(() => {
-    Promise.all([getAnosLetivosAccessivel(), getAllUsuarios()])
-      .then(([anos, usuariosRes]) => {
+    Promise.all([carregarAnosLetivos(), getAllUsuarios()])
+      .then(([{ anos, anoCorrenteId }, usuariosRes]) => {
         setAnosLetivos(anos);
         setUsuariosAluno(
           usuariosRes.data.data.filter((u) => u.role === ROLES.Aluno),
         );
-        if (anos.length > 0) setAnoLetivoFiltro(String(anos[0].id));
+        setAnoLetivoFiltro(anoCorrenteId);
       })
       .finally(() => setLoadingSelects(false));
   }, []);
@@ -114,15 +118,74 @@ export default function Alunos() {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
+  // O ano letivo do aluno é sempre o da turma escolhida
+  const turmaDoForm = turmas.find((t) => String(t.id) === String(form.turmaId));
+  const anoDoForm = turmaDoForm
+    ? (turmaDoForm.anoLetivoAno ??
+      anosLetivos.find((a) => a.id === turmaDoForm.anoLetivoId)?.ano)
+    : null;
+
+  // Na criação, não oferece usuários que já estão nesta turma
+  const usuariosDisponiveis = editItem
+    ? usuariosAluno
+    : usuariosAluno.filter(
+        (u) => !items.some((i) => String(i.userId) === String(u.id)),
+      );
+
   function openCreate() {
     setEditItem(null);
+    setModo("novo");
+    setInfoAnterior("");
     setForm({
       ...defaultForm,
-      anoLetivoId: anoLetivoFiltro,
       turmaId: turmaSelecionada,
     });
     setError("");
     setShowModal(true);
+  }
+
+  function trocarModo(novoModo) {
+    setModo(novoModo);
+    setInfoAnterior("");
+    setForm((f) => ({ ...defaultForm, turmaId: f.turmaId }));
+  }
+
+  // Renovação: busca o cadastro mais recente do aluno em outro ano para
+  // reaproveitar nome e data de nascimento
+  async function selecionarAlunoExistente(userId) {
+    setForm((f) => ({ ...f, userId }));
+    setInfoAnterior("");
+    if (!userId) return;
+
+    const anoDestino = turmaDoForm?.anoLetivoId;
+    const outrosAnos = [...anosLetivos]
+      .filter((a) => a.id !== anoDestino)
+      .sort((a, b) => b.ano - a.ano);
+
+    setBuscandoAnterior(true);
+    try {
+      for (const ano of outrosAnos) {
+        try {
+          const { data } = await getAlunoByUsuario(userId, ano.id);
+          setForm((f) =>
+            f.userId === userId
+              ? { ...f, nome: data.nome, dataNascimento: data.dataNascimento }
+              : f,
+          );
+          setInfoAnterior(
+            `Dados copiados da matrícula de ${ano.ano}${data.turmaNome ? ` (${data.turmaNome})` : ""}. O cadastro de ${ano.ano} não será alterado.`,
+          );
+          return;
+        } catch {
+          // sem cadastro nesse ano — tenta o anterior
+        }
+      }
+      setInfoAnterior(
+        "Nenhuma matrícula anterior encontrada para este usuário. Preencha os dados manualmente.",
+      );
+    } finally {
+      setBuscandoAnterior(false);
+    }
   }
 
   function openEdit(item) {
@@ -132,7 +195,6 @@ export default function Alunos() {
       numeroChamada: item.numeroChamada,
       dataNascimento: item.dataNascimento,
       turmaId: item.turmaId,
-      anoLetivoId: item.anoLetivoId,
       userId: item.userId,
     });
     setError("");
@@ -141,6 +203,10 @@ export default function Alunos() {
 
   async function handleSave(e) {
     e.preventDefault();
+    if (!turmaDoForm) {
+      setError("Selecione a turma.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -149,7 +215,7 @@ export default function Alunos() {
         numeroChamada: Number(form.numeroChamada),
         dataNascimento: form.dataNascimento,
         turmaId: Number(form.turmaId),
-        anoLetivoId: Number(form.anoLetivoId),
+        anoLetivoId: Number(turmaDoForm.anoLetivoId),
         userId: Number(form.userId),
       };
       if (editItem) {
@@ -343,7 +409,68 @@ export default function Alunos() {
                 {error}
               </Alert>
             )}
+
+            {!editItem && (
+              <div className="d-flex flex-wrap gap-3 mb-3">
+                <Form.Check
+                  type="radio"
+                  id="modo-novo"
+                  name="modo-cadastro"
+                  label="Aluno novo"
+                  checked={modo === "novo"}
+                  onChange={() => trocarModo("novo")}
+                />
+                <Form.Check
+                  type="radio"
+                  id="modo-renovacao"
+                  name="modo-cadastro"
+                  label="Renovação (aluno já cadastrado)"
+                  checked={modo === "renovacao"}
+                  onChange={() => trocarModo("renovacao")}
+                />
+              </div>
+            )}
+
+            {editItem && (
+              <Alert variant="warning" className="py-2 small">
+                Para matricular este aluno em outro ano letivo, use{" "}
+                <strong>Novo Aluno → Renovação</strong> na turma do novo ano.
+                Não altere este cadastro para trocar de ano: isso apagaria o
+                histórico de frequência e notas.
+              </Alert>
+            )}
+
             <Row className="g-3">
+              {modo === "renovacao" && !editItem && (
+                <Col xs={12}>
+                  <Form.Group>
+                    <Form.Label className="small fw-medium">
+                      Aluno já cadastrado (usuário do sistema)
+                    </Form.Label>
+                    <Form.Select
+                      value={form.userId}
+                      onChange={(e) => selecionarAlunoExistente(e.target.value)}
+                      required
+                      autoFocus
+                    >
+                      <option value="">Selecione</option>
+                      {usuariosDisponiveis.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.nome} — {u.email}
+                        </option>
+                      ))}
+                    </Form.Select>
+                    {buscandoAnterior ? (
+                      <Form.Text className="d-flex align-items-center gap-1">
+                        <Spinner size="sm" variant="secondary" /> Buscando
+                        matrícula anterior...
+                      </Form.Text>
+                    ) : (
+                      infoAnterior && <Form.Text>{infoAnterior}</Form.Text>
+                    )}
+                  </Form.Group>
+                </Col>
+              )}
               <Col xs={12} md={8}>
                 <Form.Group>
                   <Form.Label className="small fw-medium">Nome</Form.Label>
@@ -352,7 +479,7 @@ export default function Alunos() {
                     onChange={(e) => set("nome", e.target.value)}
                     placeholder="Nome completo"
                     required
-                    autoFocus
+                    autoFocus={modo === "novo" || !!editItem}
                   />
                 </Form.Group>
               </Col>
@@ -385,25 +512,6 @@ export default function Alunos() {
               </Col>
               <Col xs={12} md={4}>
                 <Form.Group>
-                  <Form.Label className="small fw-medium">
-                    Ano Letivo
-                  </Form.Label>
-                  <Form.Select
-                    value={form.anoLetivoId}
-                    onChange={(e) => set("anoLetivoId", e.target.value)}
-                    required
-                  >
-                    <option value="">Selecione</option>
-                    {anosLetivos.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.ano}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col xs={12} md={4}>
-                <Form.Group>
                   <Form.Label className="small fw-medium">Turma</Form.Label>
                   <Form.Select
                     value={form.turmaId}
@@ -419,30 +527,52 @@ export default function Alunos() {
                   </Form.Select>
                 </Form.Group>
               </Col>
-              <Col xs={12}>
+              <Col xs={12} md={4}>
                 <Form.Group>
                   <Form.Label className="small fw-medium">
-                    Usuário do sistema (perfil Aluno)
+                    Ano Letivo
                   </Form.Label>
-                  <Form.Select
-                    value={form.userId}
-                    onChange={(e) => set("userId", e.target.value)}
-                    required
-                  >
-                    <option value="">Selecione</option>
-                    {usuariosAluno.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.nome} — {u.email}
-                      </option>
-                    ))}
-                  </Form.Select>
-                  {usuariosAluno.length === 0 && (
-                    <Form.Text className="text-danger">
-                      Nenhum usuário com perfil Aluno disponível.
-                    </Form.Text>
-                  )}
+                  <Form.Control
+                    value={anoDoForm ?? ""}
+                    placeholder="Definido pela turma"
+                    readOnly
+                    disabled
+                  />
                 </Form.Group>
               </Col>
+              {(modo === "novo" || editItem) && (
+                <Col xs={12}>
+                  <Form.Group>
+                    <Form.Label className="small fw-medium">
+                      Usuário do sistema (perfil Aluno)
+                    </Form.Label>
+                    <Form.Select
+                      value={form.userId}
+                      onChange={(e) => set("userId", e.target.value)}
+                      required
+                    >
+                      <option value="">Selecione</option>
+                      {usuariosDisponiveis.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.nome} — {u.email}
+                        </option>
+                      ))}
+                    </Form.Select>
+                    {usuariosDisponiveis.length === 0 ? (
+                      <Form.Text className="text-danger">
+                        Nenhum usuário com perfil Aluno disponível.
+                      </Form.Text>
+                    ) : (
+                      !editItem && (
+                        <Form.Text>
+                          Se o aluno já estudou na escola, use{" "}
+                          <strong>Renovação</strong> para manter o mesmo login.
+                        </Form.Text>
+                      )
+                    )}
+                  </Form.Group>
+                </Col>
+              )}
             </Row>
           </Modal.Body>
           <Modal.Footer>
@@ -457,7 +587,7 @@ export default function Alunos() {
               type="submit"
               variant="primary"
               size="sm"
-              disabled={saving || usuariosAluno.length === 0}
+              disabled={saving || buscandoAnterior || usuariosDisponiveis.length === 0}
             >
               {saving && <Spinner size="sm" className="me-1" />}
               Salvar

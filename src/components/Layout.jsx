@@ -21,6 +21,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { ROLES, ROLE_LABELS } from '../utils/constants';
 import { getTurmasByProfessor } from '../api/turmas';
+import { getAnoLetivoCorrenteId } from '../api/anoLetivo';
 
 const gestao = [ROLES.Admin, ROLES.Diretor, ROLES.Coordenador];
 const academico = [ROLES.Admin, ROLES.Diretor, ROLES.Coordenador, ROLES.Professor];
@@ -51,7 +52,12 @@ export default function Layout() {
 
   useEffect(() => {
     if (user.role !== ROLES.Professor) return;
-    getTurmasByProfessor(user.id)
+    // Menu do professor reflete apenas as turmas do ano corrente
+    getAnoLetivoCorrenteId()
+      .then((anoId) => {
+        if (!anoId) throw new Error('sem ano corrente');
+        return getTurmasByProfessor(user.id, anoId);
+      })
       .then(({ data }) => {
         const turmas = data.data ?? data;
         setSegmentos({

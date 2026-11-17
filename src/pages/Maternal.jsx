@@ -3,7 +3,7 @@ import { Card, Button, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
 import { Baby } from 'lucide-react';
 import { getDesenvolvimentoByAlunoAno, lancaDesenvolvimento } from '../api/desenvolvimentoMaternal';
 import { getTurmasByAnoLetivo, getTurmasByProfessor } from '../api/turmas';
-import { getAnosLetivosAccessivel } from '../api/anoLetivo';
+import { carregarAnosLetivos } from '../api/anoLetivo';
 import { getAlunosByTurma } from '../api/alunos';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLES, SEGMENTOS } from '../utils/constants';
@@ -33,10 +33,10 @@ export default function Maternal() {
 
   // Mount: carrega anos letivos
   useEffect(() => {
-    getAnosLetivosAccessivel()
-      .then((anos) => {
+    carregarAnosLetivos()
+      .then(({ anos, anoCorrenteId }) => {
         setAnosLetivos(anos);
-        if (anos.length > 0) setAnoLetivoSelecionado(String(anos[0].id));
+        setAnoLetivoSelecionado(anoCorrenteId);
       })
       .finally(() => setLoadingSelects(false));
   }, []);

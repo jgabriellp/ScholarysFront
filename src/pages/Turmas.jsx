@@ -18,7 +18,7 @@ import {
   updateTurma,
   deleteTurma,
 } from "../api/turmas";
-import { getAnosLetivosAccessivel } from "../api/anoLetivo";
+import { carregarAnosLetivos } from "../api/anoLetivo";
 import {
   SEGMENTO_LABELS,
   SEGMENTO_OPTIONS,
@@ -44,10 +44,10 @@ export default function Turmas() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getAnosLetivosAccessivel()
-      .then((anos) => {
+    carregarAnosLetivos()
+      .then(({ anos, anoCorrenteId }) => {
         setAnosLetivos(anos);
-        if (anos.length > 0) setAnoLetivoFiltro(String(anos[0].id));
+        setAnoLetivoFiltro(anoCorrenteId);
       })
       .finally(() => setLoadingSelects(false));
   }, []);
@@ -156,6 +156,18 @@ export default function Turmas() {
       {anosLetivos.length === 0 && (
         <Alert variant="warning" className="small py-2 mb-3">
           Cadastre um <strong>Ano Letivo</strong> antes de criar turmas.
+        </Alert>
+      )}
+
+      {canEdit && anoLetivoFiltro && (
+        <Alert variant="info" className="small py-2 mb-3">
+          Turmas novas precisam de <strong>professor e disciplina</strong>{" "}
+          vinculados em <strong>Vínculos</strong>, no mesmo ano letivo da turma
+          {(() => {
+            const ano = anosLetivos.find((a) => String(a.id) === anoLetivoFiltro);
+            return ano ? <> (<strong>{ano.ano}</strong>)</> : null;
+          })()}
+          . Sem o vínculo, o professor não enxerga a turma.
         </Alert>
       )}
 

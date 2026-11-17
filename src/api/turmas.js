@@ -6,6 +6,7 @@ export const getTurmas = (page = 1, pageSize = 100) =>
 export const getTurmasByAnoLetivo = (anoLetivoId) =>
   client.get(`/api/turma/ano-letivo/${anoLetivoId}`);
 
+// Sempre envie anoLetivoId: sem ele o backend mistura turmas de todos os anos
 export const getTurmasByProfessor = (professorId, anoLetivoId) =>
   client.get(`/api/turma/professor/${professorId}`, {
     params: anoLetivoId ? { anoLetivoId } : {},

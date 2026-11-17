@@ -5,7 +5,7 @@ import { getNotasByTurmaDisciplinaAno, lancaNota } from '../api/notas';
 import { getTurmasByAnoLetivo, getTurmasByProfessor } from '../api/turmas';
 import { getDisciplinas } from '../api/disciplinas';
 import { getVinculosByTurma } from '../api/vinculos';
-import { getAnosLetivosAccessivel } from '../api/anoLetivo';
+import { carregarAnosLetivos } from '../api/anoLetivo';
 import { getAlunosByTurma } from '../api/alunos';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLES } from '../utils/constants';
@@ -45,12 +45,12 @@ export default function Notas() {
 
   // Mount: anos letivos e disciplinas
   useEffect(() => {
-    Promise.all([getAnosLetivosAccessivel(), getDisciplinas()])
-      .then(([anos, discRes]) => {
+    Promise.all([carregarAnosLetivos(), getDisciplinas()])
+      .then(([{ anos, anoCorrenteId }, discRes]) => {
         const discs = discRes.data.data;
         setAnosLetivos(anos);
         setDisciplinas(discs);
-        if (anos.length > 0) setAnoLetivoSelecionado(String(anos[0].id));
+        setAnoLetivoSelecionado(anoCorrenteId);
         if (user.role !== ROLES.Professor && discs.length > 0) {
           setDisciplinasFiltradas(discs);
           setDisciplinaSelecionada(String(discs[0].id));

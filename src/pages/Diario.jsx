@@ -13,7 +13,7 @@ import {
 import { FileText, Printer } from "lucide-react";
 import { getDiarioMaternal, getDiarioFundamental } from "../api/diario";
 import { getTurmasByAnoLetivo, getTurmasByProfessor } from "../api/turmas";
-import { getAnosLetivosAccessivel } from "../api/anoLetivo";
+import { carregarAnosLetivos } from "../api/anoLetivo";
 import { getAlunosByTurma, getAlunoByUsuario } from "../api/alunos";
 import { useAuth } from "../contexts/AuthContext";
 import { ROLES, SEGMENTOS, SEGMENTO_LABELS } from "../utils/constants";
@@ -228,27 +228,41 @@ export default function Diario() {
   const [loadingDiario, setLoadingDiario] = useState(false);
   const [erro, setErro] = useState("");
 
-  // Mount: Aluno resolves own record; others load anos letivos
+  // Aluno: busca o próprio cadastro no ano informado (sem ano = ano corrente).
+  // O ano é definido antes da busca para que o erro de "sem matrícula" não seja
+  // limpo pelo effect do diário.
+  function carregarRegistroAluno(anoId) {
+    setAlunoSelecionado("");
+    setTurmaSelecionada("");
+    setSegmento(null);
+    setDiario(null);
+    setErro("");
+    if (anoId) setAnoLetivoSelecionado(anoId);
+    return getAlunoByUsuario(user.id, anoId || undefined)
+      .then(({ data }) => {
+        setAlunoSelecionado(String(data.id));
+        setAnoLetivoSelecionado(String(data.anoLetivoId));
+        setTurmaSelecionada(String(data.turmaId));
+      })
+      .catch(() =>
+        setErro(
+          anoId
+            ? "Você não possui matrícula neste ano letivo."
+            : "Não foi possível carregar o seu registro de aluno.",
+        ),
+      );
+  }
+
+  // Mount: anos letivos (padrão = ano corrente); Aluno resolve o próprio cadastro
   useEffect(() => {
-    if (isAluno) {
-      getAlunoByUsuario(user.id)
-        .then(({ data }) => {
-          setAlunoSelecionado(String(data.id));
-          setAnoLetivoSelecionado(String(data.anoLetivoId));
-          setTurmaSelecionada(String(data.turmaId));
-        })
-        .catch(() =>
-          setErro("Não foi possível carregar o seu registro de aluno."),
-        )
-        .finally(() => setLoadingSelects(false));
-    } else {
-      getAnosLetivosAccessivel()
-        .then((anos) => {
-          setAnosLetivos(anos);
-          if (anos.length > 0) setAnoLetivoSelecionado(String(anos[0].id));
-        })
-        .finally(() => setLoadingSelects(false));
-    }
+    carregarAnosLetivos()
+      .catch(() => ({ anos: [], anoCorrenteId: "" }))
+      .then(({ anos, anoCorrenteId }) => {
+        setAnosLetivos(anos);
+        if (isAluno) return carregarRegistroAluno(anoCorrenteId);
+        setAnoLetivoSelecionado(anoCorrenteId);
+      })
+      .finally(() => setLoadingSelects(false));
   }, []);
 
   // Ano letivo → turmas (not needed for Aluno — resolved at mount)
@@ -366,6 +380,26 @@ export default function Diario() {
           </Button>
         )}
       </div>
+
+      {isAluno && anosLetivos.length > 1 && (
+        <Card className="border-0 shadow-sm mb-3">
+          <Card.Body className="py-3 px-4">
+            <Form.Group style={{ maxWidth: 200 }}>
+              <Form.Label className="small fw-medium">Ano Letivo</Form.Label>
+              <Form.Select
+                value={anoLetivoSelecionado}
+                onChange={(e) => carregarRegistroAluno(e.target.value)}
+              >
+                {anosLetivos.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.ano}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+          </Card.Body>
+        </Card>
+      )}
 
       {!isAluno && (
         <Card className="border-0 shadow-sm mb-3">

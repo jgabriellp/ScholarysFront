@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, Button, Form, Spinner, Alert, Row, Col } from 'react-bootstrap';
 import { CalendarDays } from 'lucide-react';
 import { getDiasLetivosByAno, createDiasLetivosLote, deleteDiaLetivo } from '../api/diasLetivos';
-import { getAnoLetivos } from '../api/anoLetivo';
+import { carregarAnosLetivos } from '../api/anoLetivo';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLES, SEGMENTO_OPTIONS } from '../utils/constants';
 
@@ -104,10 +104,10 @@ export default function DiasLetivos() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getAnoLetivos()
-      .then(({ data }) => {
-        setAnosLetivos(data.data);
-        if (data.data.length > 0) setAnoSelecionado(String(data.data[0].id));
+    carregarAnosLetivos()
+      .then(({ anos, anoCorrenteId }) => {
+        setAnosLetivos(anos);
+        setAnoSelecionado(anoCorrenteId);
       })
       .finally(() => setLoadingSelects(false));
   }, []);
