@@ -267,7 +267,111 @@ Ao fazer login como Professor, o `Layout` chama `GET /api/turma/professor/{id}` 
   - **Frequência:** percentual total, total de faltas, breakdown por mês com dias de falta.
   - **Notas** (Fundamental): tabela com U1–U6, médias de semestre, média anual, recuperação, média final e resultado por disciplina.
   - **Desenvolvimentos** (Maternal): cards com descrição por bimestre.
-- Botão **Exportar PDF** chama `window.print()`. O `@media print` em `index.css` oculta toda a UI e exibe apenas `#diario-content`.
+- Botão **Exportar PDF** chama `window.print()`. A impressão usa um layout próprio (`src/components/DiarioImpressao.jsx`), renderizado no `<body>` e visível só no `@media print`: A4, Fundamental em uma folha (faltas + notas), Maternal quebrando apenas entre bimestres, e assinatura da Direção Escolar + data no pé da última página.
+
+---
+
+## Camada de API (`src/api/`)
+
+Todos os módulos exportam funções que retornam promises do Axios. A paginação padrão dos endpoints de listagem é `pageSize=100` (suficiente para selects de combos). Endpoints de lançamento (frequência, nota, desenvolvimento, relato) sempre usam `POST` pois a API implementa upsert.
+
+| Arquivo | Endpoints principais |
+|---|---|
+| `client.js` | Interceptors de auth e 401 |
+| `auth.js` | `POST /api/auth/login` |
+| `anoLetivo.js` | CRUD `/api/anoletivo` |
+| `turmas.js` | CRUD `/api/turma` · `GET /api/turma/professor/{id}` · `GET /api/turma/ano-letivo/{id}` |
+| `disciplinas.js` | CRUD `/api/disciplina` |
+| `usuarios.js` | CRUD `/api/user` |
+| `alunos.js` | CRUD `/api/aluno` · `GET /api/aluno/turma/{id}` |
+| `vinculos.js` | `POST/DELETE /api/turmadisciplinaprofessor` · `GET /api/turmadisciplinaprofessor/turma/{id}` |
+| `frequencia.js` | `POST /api/frequencia` · `GET /api/frequencia/turma/{id}/data/{data}` |
+| `notas.js` | `POST /api/nota` · `GET /api/nota/turma/{t}/disciplina/{d}/ano/{a}` |
+| `desenvolvimentoMaternal.js` | `POST /api/desenvolvimentomaternal` · `GET /api/desenvolvimentomaternal/aluno/{a}/ano/{ano}` |
+| `diasLetivos.js` | `GET /api/diaLetivo/ano-letivo/{id}` · `POST /api/diaLetivo/lote` · `DELETE /api/diaLetivo/{id}` |
+| `relatoAula.js` | `POST /api/relatoAula` · `GET /api/relatoAula/turma/{t}/ano/{a}` |
+| `diario.js` | `GET /api/diario/maternal/{a}/{ano}` · `GET /api/diario/fundamental/{a}/{ano}` |
+
+---
+
+## Padrões de implementação
+
+### Cancelamento de requisições assíncronas
+
+Páginas com múltiplas dependências de filtro usam flag `cancelled` para evitar `setState` em componentes desmontados:
+
+```js
+useEffect(() => {
+  let cancelled = false;
+  async function load() {
+    const data = await fetchSomething();
+    if (!cancelled) setState(data);
+  }
+  load();
+  return () => { cancelled = true; };
+}, [dep]);
+```
+
+### Carregamento paralelo
+
+`Promise.all` é usado quando múltiplas requisições independentes podem ser disparadas simultaneamente (ex: carregar turmas + anos letivos + disciplinas no mount).
+
+### Upsert nos lançamentos
+
+Os endpoints de frequência, notas, desenvolvimento maternal e relato de aula aceitam `POST` para criar ou atualizar. O frontend sempre usa `POST`, sem lógica de diferenciação create/update.
+
+### Soft delete
+
+Usuários, turmas e alunos têm o campo `ativo`. O delete na API seta `ativo = false`; o frontend remove o item da lista localmente após confirmação.
+
+---
+
+## Fluxo recomendado de cadastro
+
+A sequência abaixo respeita as dependências entre entidades:
+
+1. **Ano Letivo** — base para tudo
+2. **Turmas** — dependem do ano letivo e do segmento
+3. **Disciplinas** — independentes, mas com segmento definido
+4. **Usuários** — criar contas com roles adequados (Admin, Professor, Aluno…)
+5. **Alunos** — vinculam um usuário role=Aluno a uma turma/ano
+6. **Vínculos** — associam Professor + Disciplina + Turma/Ano
+7. **Dias Letivos** — calendário do ano (POST /lote)
+8. **Lançamentos** — Frequência, Notas, Desenvolvimento Maternal, Relato de Aula
+
+---
+
+## Exportação de PDF
+
+### Diário
+
+O diário usa `window.print()` com CSS nativo, sem dependências adicionais. A folha impressa é o componente `src/components/DiarioImpressao.jsx`, renderizado via portal no `<body>` (oculto na tela). O `@media print` em `index.css`:
+
+- Esconde o app inteiro (`body > #root { display: none }`) e exibe só `.diario-print`
+- Usa A4 com 10mm de margem e tipografia compacta; Fundamental cabe em uma folha
+- Evita quebra dentro de linhas de tabela e de cada bimestre do Maternal
+- Coloca a assinatura (Direção Escolar + data) no pé da última página (`margin-top: auto` num container com a altura útil do A4)
+
+### Relato de Aula `/relato-aula`
+- **Acesso:** Acadêmico
+- Filtros: ano letivo, turma (filtrada por professor quando role=Professor).
+- Lista todos os dias letivos do ano com status **Registrado** / **Pendente** e preview truncado do texto.
+- Ao clicar em um dia, abre modal com textarea para redigir ou editar o relato.
+- Salva via `POST /api/relatoAula` (upsert).
+- **Exportar PDF:** gera um documento HTML com a tabela completa de relatos (data, nº da aula, resumo de atividade, coluna de rúbrica) e chama `window.print()` em uma nova aba. Não utiliza bibliotecas externas.
+
+#### Diário `/diario`
+- **Acesso:** Todos autenticados
+- Filtros: turma, ano letivo, aluno.
+- Detecta o segmento da turma e chama o endpoint correto:
+  - Maternal → `GET /api/diario/maternal/{alunoId}/{anoLetivoId}`
+  - Fundamental → `GET /api/diario/fundamental/{alunoId}/{anoLetivoId}`
+- Exibe:
+  - **Cabeçalho:** nome, número de chamada, turma, ano, badge de segmento e resultado geral.
+  - **Frequência:** percentual total, total de faltas, breakdown por mês com dias de falta.
+  - **Notas** (Fundamental): tabela com U1–U6, médias de semestre, média anual, recuperação, média final e resultado por disciplina.
+  - **Desenvolvimentos** (Maternal): cards com descrição por bimestre.
+- Botão **Exportar PDF** chama `window.print()`. A impressão usa um layout próprio (`src/components/DiarioImpressao.jsx`), renderizado no `<body>` e visível só no `@media print`: A4, Fundamental em uma folha (faltas + notas), Maternal quebrando apenas entre bimestres, e assinatura da Direção Escolar + data no pé da última página.
 
 ---
 

@@ -32,22 +32,94 @@ body {
   @apply px-4 py-1 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-1;
 }
 
+/* ---------- Impressão do Diário (componente DiarioImpressao) ---------- */
+.diario-print { display: none; }
+
 @media print {
-  /* Oculta tudo, exibe apenas o conteúdo do diário */
-  body * { visibility: hidden; }
-  #diario-content, #diario-content * { visibility: visible; }
-  #diario-content {
-    position: absolute;
-    inset: 0;
-    padding: 24px;
-    background: white;
+  @page { size: A4; margin: 10mm; }
+
+  /* Esconde o app inteiro; imprime só a folha do diário (renderizada no body) */
+  body { background: #fff !important; }
+  body > #root { display: none !important; }
+
+  .diario-print {
+    display: flex;
+    flex-direction: column;
+    /* altura útil do A4 (297mm - 20mm de margem), com folga para arredondamento */
+    min-height: 272mm;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9pt;
+    color: #000;
+    line-height: 1.3;
   }
-  /* Remove sombras e ajusta bordas para impressão */
-  #diario-content .shadow-sm { box-shadow: none !important; }
-  #diario-content .border-0 { border: 1px solid #dee2e6 !important; }
-  /* Evita quebra dentro de cards */
-  #diario-content .card { break-inside: avoid; }
-  /* Tabela de notas: permite quebra apenas entre linhas */
-  #diario-content table { break-inside: auto; }
-  #diario-content tr { break-inside: avoid; }
+
+  .diario-print h1 { font-size: 13pt; font-weight: 700; margin: 0 0 2pt; }
+  .diario-print p { margin: 0; }
+
+  .dp-cabecalho {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 12pt;
+    padding-bottom: 4pt;
+    border-bottom: 1.5pt solid #000;
+    margin-bottom: 8pt;
+  }
+  .dp-cabecalho-dir { text-align: right; }
+
+  .dp-bloco { margin-bottom: 8pt; }
+  .dp-titulo {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10pt;
+    font-weight: 700;
+    margin: 0 0 3pt;
+    break-after: avoid;
+  }
+  .dp-titulo-info { font-weight: 400; }
+  .dp-vazio { font-style: italic; }
+
+  .dp-tabela { width: 100%; border-collapse: collapse; }
+  .dp-tabela th,
+  .dp-tabela td {
+    border: 0.75pt solid #555;
+    padding: 1.5pt 3pt;
+    vertical-align: top;
+  }
+  .dp-tabela th { background: #eee; font-weight: 700; text-align: left; }
+  .dp-tabela tr { break-inside: avoid; }
+  .dp-centro { text-align: center; }
+
+  .dp-notas { font-size: 8.5pt; }
+  .dp-notas th,
+  .dp-notas td { text-align: center; padding: 1.5pt 2pt; }
+  .dp-notas .dp-esquerda { text-align: left; }
+  .dp-notas .dp-media { font-weight: 700; }
+
+  /* Maternal: cada bimestre inteiro; a quebra só acontece entre bimestres */
+  .dp-bimestre {
+    border: 0.75pt solid #555;
+    padding: 4pt 6pt;
+    margin-bottom: 5pt;
+    break-inside: avoid;
+  }
+  .dp-bimestre h3 { font-size: 9.5pt; font-weight: 700; margin: 0 0 2pt; }
+  .dp-bimestre p { white-space: pre-wrap; text-align: justify; }
+
+  .dp-assinatura {
+    margin-top: auto;
+    padding-top: 28pt;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24pt;
+    break-inside: avoid;
+  }
+  .dp-linha {
+    flex: 0 0 55%;
+    border-top: 0.75pt solid #000;
+    padding-top: 2pt;
+    text-align: center;
+  }
+  .dp-data { white-space: nowrap; }
 }

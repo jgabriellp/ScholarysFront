@@ -16,6 +16,7 @@ import { getTurmasByAnoLetivo, getTurmasByProfessor } from "../api/turmas";
 import { carregarAnosLetivos } from "../api/anoLetivo";
 import { getAlunosByTurma, getAlunoByUsuario } from "../api/alunos";
 import { useAuth } from "../contexts/AuthContext";
+import DiarioImpressao from "../components/DiarioImpressao";
 import { ROLES, SEGMENTOS, SEGMENTO_LABELS } from "../utils/constants";
 
 function fmt(valor) {
@@ -492,6 +493,7 @@ export default function Diario() {
         </div>
       ) : diario ? (
         <div id="diario-content">
+          <DiarioImpressao diario={diario} segmento={segmento} />
           <Card className="border-0 shadow-sm mb-3">
             <Card.Body className="py-3 px-4">
               <Row className="g-2">
